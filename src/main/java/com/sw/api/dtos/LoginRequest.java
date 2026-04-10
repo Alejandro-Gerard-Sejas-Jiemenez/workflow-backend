@@ -5,4 +5,4 @@
 
 package com.sw.api.dtos;
 
-public record LoginRequest(String correo, String password) {}
+public record LoginRequest(String email, String password) {}

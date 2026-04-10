@@ -36,10 +36,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
                                                                 "/swagger-ui.html")
                                                 .permitAll()
-                                                // Permitimos ver publicaciones e inmuebles sin estar logueado
-                                                .requestMatchers(HttpMethod.GET, "/api/publicaciones/**",
-                                                                "/api/inmuebles/**")
-                                                .permitAll()
                                                 // Cualquier otra petición a la API exigirá un token válido
                                                 .anyRequest().authenticated())
 

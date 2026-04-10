@@ -22,8 +22,8 @@ public class ApplicationConfig {
     // 1. Le enseñamos a Spring cómo buscar a un usuario en tu base de datos
     @Bean
     public UserDetailsService userDetailsService() {
-        return username -> usuarioRepository.findByCorreo(username) // <-- Cambio aquí
-                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con el correo: " + username));
+        return username -> usuarioRepository.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con el email: " + username));
     }
     // 2. Le decimos a Spring qué algoritmo usar para encriptar contraseñas (BCrypt es el estándar de la industria)
     @Bean

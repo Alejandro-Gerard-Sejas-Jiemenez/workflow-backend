@@ -6,10 +6,9 @@
 package com.sw.api.dtos;
 
 public record RegisterRequest(
-    String correo,
+    String email,
     String password,
     String nombre,
     String apellido,
-    String fotoUrl,
-    String tipoPerfil 
+    String departamento
 ) {}

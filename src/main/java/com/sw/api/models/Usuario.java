@@ -1,46 +1,48 @@
 package com.sw.api.models;
 
-import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import com.sw.api.models.Rol;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 
 @Getter @Setter
-@Entity
-@Table(name = "usuario")
+@Document(collection = "usuarios")
 public class Usuario extends Auditable implements UserDetails {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    private String id;
 
-    @Column(unique = true, nullable = false)
-    private String correo;
+    private String nombre;
 
-    @Column(nullable = false)
+    private String apellido;
+
+    private String email;
+
     private String password;
 
-    @Column(name = "estado_conexion")
+    private String departamento;
+
     private boolean estadoConexion = false;
 
-    @Column(name = "ultima_conexion")
     private LocalDateTime ultimaConexion;
     
-    @ManyToOne
-    @JoinColumn(name = "id_rol")
+    @DBRef
     private Rol rol;
     
-    //Atributos de auditoria
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        String roleName = "ROLE_USER";
+        if (rol != null && rol.getNombre() != null) {
+            roleName = rol.getNombre();
+        }
+        return List.of(new SimpleGrantedAuthority(roleName));
     }
 
     @Override
@@ -50,7 +52,7 @@ public class Usuario extends Auditable implements UserDetails {
 
     @Override
     public String getUsername() {
-        return this.correo; 
+        return this.email; 
     }
 
     @Override

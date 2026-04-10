@@ -1,11 +1,10 @@
 package com.sw.api.models;
 
-import jakarta.persistence.*;
 import lombok.*;
-import java.util.UUID;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity
-@Table(name = "rol")
+@Document(collection = "roles")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,9 +12,7 @@ import java.util.UUID;
 public class Rol {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    private String id;
 
-    @Column(nullable = false, unique = true)
     private String nombre; 
 }
