@@ -1,258 +1,103 @@
-# 🏢 Guía: Crear Endpoint (POST) para Inmueble - Spring Boot + Flyway + Swagger
+# 🚀 Guía: Cómo crear una nueva funcionalidad (CRUD)
 
-Este documento explica cómo crear **un endpoint para registrar un inmueble** dentro de un sistema inmobiliario.
-
----
-
-# 🧱 1. Base de Datos (Flyway)
-
-**Rol:** Define la estructura física de la base de datos de forma versionada.
-
-**Importancia:**
-
-* Permite mantener control de cambios en la BD
-* Evita inconsistencias entre entornos (dev, QA, prod)
-* Garantiza que todos tengan la misma estructura
-
-Ubicación:
-
-```
-src/main/resources/db/migration
-```
-
-Archivo:
-
-```
-V1__create_table_inmueble.sql
-```
-
-```sql
-CREATE TABLE inmueble (
-    id_inmueble BIGSERIAL PRIMARY KEY,
-    tipo_inmueble VARCHAR(50) NOT NULL,
-    area_terreno DECIMAL(10,2),
-    area_construida DECIMAL(10,2),
-    habitaciones INT,
-    banos INT,
-    garajes INT,
-    antiguedad_anios INT
-);
-```
-
-✔️ Se ejecuta automáticamente al iniciar la aplicación.
+Esta guía explica el flujo para crear una nueva entidad en este proyecto utilizando **Spring Boot** y **MongoDB**.
 
 ---
 
-# 🧩 2. Model
+## 📄 1. El Modelo (Documento)
+A diferencia de SQL, aquí no usamos Flyway ni tablas. Creamos una clase con `@Document`.
 
-**Rol:** Representa la estructura de datos dentro de la aplicación.
-
-**Importancia:**
-
-* Es el objeto que viaja entre capas (Repository ↔ Service)
-* Modela la tabla de la BD en código Java
+**Ubicación:** `src/main/java/com/sw/api/models/`
 
 ```java
-public class Inmueble {
-
-    private Long id;
-    private String tipoInmueble;
-    private Double areaTerreno;
-    private Double areaConstruida;
-    private Integer habitaciones;
-    private Integer banos;
-    private Integer garajes;
-    private Integer antiguedadAnios;
+@Document(collection = "entidades")
+@Getter @Setter
+public class MiEntidad {
+    @Id
+    private String id; // Siempre usaremos String para MongoDB (ObjectId)
+    private String nombre;
 }
 ```
 
 ---
 
-# 📄 3. DTOs
+## 🗄️ 2. El Repositorio
+Heredamos de `MongoRepository`. Esto nos da automáticamente métodos como `save()`, `findAll()` y `deleteById()`.
 
-**Rol:** Definen los datos que entran y salen del sistema.
-
-**Importancia:**
-
-* Evitan exponer directamente el modelo interno
-* Permiten controlar qué datos recibe y devuelve la API
-
-## Request DTO
-
-```java
-public class InmuebleRequestDTO {
-    private String tipoInmueble;
-    private Double areaTerreno;
-    private Double areaConstruida;
-    private Integer habitaciones;
-    private Integer banos;
-    private Integer garajes;
-    private Integer antiguedadAnios;
-}
-```
-
-## Response DTO
-
-```java
-public class InmuebleResponseDTO {
-    private Long id;
-    private String tipoInmueble;
-    private Double areaTerreno;
-    private Double areaConstruida;
-    private Integer habitaciones;
-    private Integer banos;
-    private Integer garajes;
-    private Integer antiguedadAnios;
-}
-```
-
----
-
-# 📦 4. Repository
-
-**Rol:** Capa de acceso a datos.
-
-**Importancia:**
-
-* Se encarga de interactuar con la base de datos
-* Evita escribir SQL manual para operaciones básicas
-* Permite usar métodos CRUD automáticamente
+**Ubicación:** `src/main/java/com/sw/api/repositories/`
 
 ```java
 @Repository
-public interface InmuebleRepository extends JpaRepository<Inmueble, Long> {
+public interface MiEntidadRepository extends MongoRepository<MiEntidad, String> {
+    // Puedes agregar consultas personalizadas si quieres
+    Optional<MiEntidad> findByNombre(String nombre);
 }
 ```
 
 ---
 
-# 🧠 5. Service
+## 📦 3. Los DTOs (Request/Response)
+Son necesarios para no exponer el modelo interno a la API. Usamos `record` para que sea más limpio.
 
-**Rol:** Contiene la lógica de negocio.
+**Ubicación:** `src/main/java/com/sw/api/dtos/`
 
-**Importancia:**
+```java
+public record MiEntidadRequest(String nombre) {}
+public record MiEntidadResponse(String id, String nombre) {}
+```
 
-* Centraliza reglas del sistema
-* Orquesta la conversión DTO ↔ Model
-* Evita lógica en el controller
+---
+
+## 🧠 4. El Servicio
+Aquí vive la "lógica". Es donde convertimos el DTO a Modelo y viceversa.
+
+**Ubicación:** `src/main/java/com/sw/api/services/`
 
 ```java
 @Service
-public class InmuebleService {
+@RequiredArgsConstructor
+public class MiEntidadService {
+    private final MiEntidadRepository repository;
 
-    private final InmuebleRepository repository;
-
-    public InmuebleService(InmuebleRepository repository) {
-        this.repository = repository;
-    }
-
-    public InmuebleResponseDTO crear(InmuebleRequestDTO dto) {
-
-        // DTO → Model
-        Inmueble inmueble = new Inmueble();
-        inmueble.setTipoInmueble(dto.getTipoInmueble());
-        inmueble.setAreaTerreno(dto.getAreaTerreno());
-        inmueble.setAreaConstruida(dto.getAreaConstruida());
-        inmueble.setHabitaciones(dto.getHabitaciones());
-        inmueble.setBanos(dto.getBanos());
-        inmueble.setGarajes(dto.getGarajes());
-        inmueble.setAntiguedadAnios(dto.getAntiguedadAnios());
-
-        Inmueble guardado = repository.save(inmueble);
-
-        // Model → Response DTO
-        InmuebleResponseDTO response = new InmuebleResponseDTO();
-        response.setId(guardado.getId());
-        response.setTipoInmueble(guardado.getTipoInmueble());
-        response.setAreaTerreno(guardado.getAreaTerreno());
-        response.setAreaConstruida(guardado.getAreaConstruida());
-        response.setHabitaciones(guardado.getHabitaciones());
-        response.setBanos(guardado.getBanos());
-        response.setGarajes(guardado.getGarajes());
-        response.setAntiguedadAnios(guardado.getAntiguedadAnios());
-
-        return response;
+    public MiEntidadResponse crear(MiEntidadRequest request) {
+        MiEntidad entidad = new MiEntidad();
+        entidad.setNombre(request.nombre());
+        MiEntidad guardado = repository.save(entidad);
+        return new MiEntidadResponse(guardado.getId(), guardado.getNombre());
     }
 }
 ```
 
 ---
 
-# 🌐 6. Controller (Endpoint)
+## 🔌 5. El Controlador
+Expone el servicio al mundo exterior a través de una URL.
 
-**Rol:** Expone la API al exterior.
-
-**Importancia:**
-
-* Recibe peticiones HTTP
-* Valida/transforma inputs básicos
-* Delega la lógica al Service
+**Ubicación:** `src/main/java/com/sw/api/controllers/`
 
 ```java
 @RestController
-@RequestMapping("/api/inmuebles")
-public class InmuebleController {
-
-    private final InmuebleService service;
-
-    public InmuebleController(InmuebleService service) {
-        this.service = service;
-    }
+@RequestMapping("/api/mi-entidad")
+@RequiredArgsConstructor
+public class MiEntidadController {
+    private final MiEntidadService service;
 
     @PostMapping
-    public ResponseEntity<InmuebleResponseDTO> crear(@RequestBody InmuebleRequestDTO dto) {
-        return ResponseEntity.ok(service.crear(dto));
+    public ResponseEntity<MiEntidadResponse> crear(@RequestBody MiEntidadRequest request) {
+        return ResponseEntity.ok(service.crear(request));
     }
 }
 ```
 
 ---
 
-# 🧪 7. Probar con Swagger
+## 💡 Recordatorios Clave para el Examen
 
-**Rol:** Herramienta de documentación y pruebas de la API.
+> [!TIP]
+> **Schema-less**: En MongoDB no necesitas crear tablas. Si añades un nuevo atributo a tu clase `MiEntidad`, MongoDB lo guardará automáticamente la próxima vez que llames a `save()`.
 
-**Importancia:**
+> [!IMPORTANT]
+> **Inyección de Dependencias**: Siempre usa `@RequiredArgsConstructor` de Lombok y marca tus variables como `private final`. Esto es el estándar moderno en Spring Boot.
 
-* Permite probar endpoints sin herramientas externas
-* Facilita el entendimiento del contrato de la API
-
-Acceso:
-
-```
-http://localhost:8080/swagger-ui/index.html
-```
-
-## Endpoint
-
-```
-POST /api/inmuebles
-```
-
-## Body de ejemplo
-
-```json
-{
-  "tipoInmueble": "Casa",
-  "areaTerreno": 250.5,
-  "areaConstruida": 180.0,
-  "habitaciones": 4,
-  "banos": 3,
-  "garajes": 2,
-  "antiguedadAnios": 5
-}
-```
-
----
-
-# 🧱 Estructura esperada
-
-```
-controller/
-service/
-repository/
-dto/
-model/
-```
-
-
+> [!CAUTION]
+> **IDs**: Recuerda que en este proyecto decidimos usar `String` para los IDs. Si usas `Long` o `Integer`, MongoDB te dará errores de tipo.
