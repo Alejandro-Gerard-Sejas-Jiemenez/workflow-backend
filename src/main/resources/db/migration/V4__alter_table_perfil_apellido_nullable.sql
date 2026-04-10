@@ -1,0 +1,1 @@
+ALTER TABLE perfil ALTER COLUMN apellido DROP NOT NULL;
