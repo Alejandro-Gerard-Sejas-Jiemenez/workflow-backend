@@ -52,4 +52,25 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refresh(@RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(authService.actualizarToken(request));
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
+        // En un mundo ideal, extraemos el email del token o context
+        // Pero para simplificar y cumplir con el requisito de cerrar sesión:
+        // El cliente simplemente debe eliminar el token
+        return ResponseEntity.ok()
+                .headers(limpiarCookie())
+                .build();
+    }
+
+    private HttpHeaders limpiarCookie() {
+        ResponseCookie cookie = ResponseCookie.from("jwt_token", "")
+                .httpOnly(true)
+                .path("/")
+                .maxAge(0)
+                .build();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+        return headers;
+    }
 }

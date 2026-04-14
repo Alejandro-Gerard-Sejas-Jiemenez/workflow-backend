@@ -10,5 +10,6 @@ public record RegisterRequest(
     String password,
     String nombre,
     String apellido,
-    String departamento
+    String departamento,
+    String telefono
 ) {}

@@ -29,6 +29,10 @@ public class Usuario extends Auditable implements UserDetails {
 
     private String departamento;
 
+    private String telefono;
+
+    private boolean activo = true;
+
     private boolean estadoConexion = false;
 
     private LocalDateTime ultimaConexion;
@@ -65,5 +69,5 @@ public class Usuario extends Auditable implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() { return this.activo; }
 }

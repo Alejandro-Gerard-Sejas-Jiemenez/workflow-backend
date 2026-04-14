@@ -50,6 +50,7 @@ public class AuthService {
         nuevoUsuario.setNombre(request.nombre());
         nuevoUsuario.setApellido(request.apellido());
         nuevoUsuario.setDepartamento(request.departamento());
+        nuevoUsuario.setTelefono(request.telefono());
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
         nuevoUsuario.setEstadoConexion(true);
         nuevoUsuario.setUltimaConexion(LocalDateTime.now());
@@ -71,8 +72,13 @@ public class AuthService {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
 
-        var user = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        var user = usuarioRepository.findByEmailAndActivoTrue(request.email())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado o inactivo"));
+
+        // Actualizar estado de conexión
+        user.setEstadoConexion(true);
+        user.setUltimaConexion(LocalDateTime.now());
+        usuarioRepository.save(user);
 
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
@@ -83,6 +89,14 @@ public class AuthService {
         
         var jwtToken = jwtService.generarToken(extraClaims, user);
         return new AuthResponse(jwtToken);
+    }
+
+    public void logout(String email) {
+        var user = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        
+        user.setEstadoConexion(false);
+        usuarioRepository.save(user);
     }
 
     public AuthResponse actualizarToken(RefreshTokenRequest request) {
