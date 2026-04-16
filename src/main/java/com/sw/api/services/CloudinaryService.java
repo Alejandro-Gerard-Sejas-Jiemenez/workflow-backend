@@ -23,9 +23,9 @@ public class CloudinaryService {
             throw new IllegalArgumentException("No se enviaron archivos o está vacío.");
         }
 
-        // Subida masiva al folder "spaceshift_inmuebles" para ordenarlo en Cloudinary
+        // Subida masiva al folder "workflow_files" para ordenarlo en Cloudinary
         Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
-                "folder", "spaceshift_inmuebles"
+                "folder", "workflow_files"
         ));
 
         // Obtener la URL segura de retorno

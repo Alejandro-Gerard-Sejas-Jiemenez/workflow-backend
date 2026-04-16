@@ -1,4 +1,4 @@
-# Diccionario de Datos - SpaceShift Workflow Engine
+# Diccionario de Datos - Workflow Engine Backend
 
 Este documento detalla la estructura de datos de los principales módulos del sistema implementados en MongoDB.
 

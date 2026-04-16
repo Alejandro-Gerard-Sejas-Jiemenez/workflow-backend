@@ -1,6 +1,6 @@
-# 🚀 SpaceShift Backend - API de Gestión
+# 🚀 Workflow Engine Backend - API de Gestión
 
-Este es el núcleo de servicios para el proyecto **SpaceShift**, desarrollado con **Spring Boot 4** y **Java 21**. Implementa una arquitectura moderna NoSQL y seguridad basada en **JWT**.
+Este es el núcleo de servicios para el proyecto **Workflow Engine**, desarrollado con **Spring Boot 4** y **Java 21**. Implementa una arquitectura moderna NoSQL y seguridad basada en **JWT**.
 
 ---
 
