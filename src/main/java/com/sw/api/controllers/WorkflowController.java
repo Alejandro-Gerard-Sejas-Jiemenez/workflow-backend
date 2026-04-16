@@ -17,13 +17,13 @@ public class WorkflowController {
     private final WorkflowService workflowService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE', 'ROLE_DESIGNER')")
     public ResponseEntity<List<Workflow>> obtenerTodos() {
         return ResponseEntity.ok(workflowService.obtenerTodos());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE', 'ROLE_DESIGNER')")
     public ResponseEntity<Workflow> obtenerPorId(@PathVariable String id) {
         return ResponseEntity.ok(workflowService.obtenerPorId(id));
     }

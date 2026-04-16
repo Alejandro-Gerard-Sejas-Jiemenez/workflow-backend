@@ -1,5 +1,6 @@
 package com.sw.api.services;
 
+import com.sw.api.dtos.UsuarioCreateDTO;
 import com.sw.api.dtos.UsuarioResponseDTO;
 import com.sw.api.dtos.UsuarioUpdateDTO;
 import com.sw.api.models.Usuario;
@@ -22,6 +23,27 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final RolRepository rolRepository;
     private final PasswordEncoder passwordEncoder;
+
+    public UsuarioResponseDTO crear(UsuarioCreateDTO dto) {
+        if (usuarioRepository.findByEmail(dto.email()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email ya está registrado");
+        }
+
+        Rol rol = rolRepository.findById(dto.rolId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rol no encontrado"));
+
+        Usuario usuario = new Usuario();
+        usuario.setNombre(dto.nombre());
+        usuario.setApellido(dto.apellido());
+        usuario.setEmail(dto.email());
+        usuario.setPassword(passwordEncoder.encode(dto.password()));
+        usuario.setDepartamento(dto.departamento());
+        usuario.setTelefono(dto.telefono());
+        usuario.setRol(rol);
+        usuario.setActivo(true);
+
+        return mapToDTO(usuarioRepository.save(usuario));
+    }
 
     public List<UsuarioResponseDTO> obtenerTodos() {
         return usuarioRepository.findAllByActivoTrue().stream()

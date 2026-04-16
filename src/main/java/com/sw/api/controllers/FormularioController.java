@@ -17,13 +17,13 @@ public class FormularioController {
     private final FormularioService formularioService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_EMPLEADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_DESIGNER')")
     public ResponseEntity<List<Formulario>> obtenerTodos() {
         return ResponseEntity.ok(formularioService.obtenerTodos());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE', 'ROLE_DESIGNER')")
     public ResponseEntity<Formulario> obtenerPorId(@PathVariable String id) {
         return ResponseEntity.ok(formularioService.obtenerPorId(id));
     }

@@ -1,8 +1,10 @@
 package com.sw.api.controllers;
 
+import com.sw.api.dtos.UsuarioCreateDTO;
 import com.sw.api.dtos.UsuarioResponseDTO;
 import com.sw.api.dtos.UsuarioUpdateDTO;
 import com.sw.api.services.UsuarioService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,17 +15,24 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/usuarios")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ROLE_ADMIN')")
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
 
+    @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<UsuarioResponseDTO> crearUsuario(@Valid @RequestBody UsuarioCreateDTO dto) {
+        return ResponseEntity.ok(usuarioService.crear(dto));
+    }
+
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<UsuarioResponseDTO>> obtenerUsuarios() {
         return ResponseEntity.ok(usuarioService.obtenerTodos());
     }
 
     @GetMapping("/inactivos")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<UsuarioResponseDTO>> obtenerUsuariosInactivos() {
         return ResponseEntity.ok(usuarioService.obtenerInactivos());
     }

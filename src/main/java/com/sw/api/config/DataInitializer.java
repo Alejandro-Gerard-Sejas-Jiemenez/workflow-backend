@@ -34,7 +34,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initializeRoles() {
-        List<String> rolesToInitialize = List.of("ROLE_ADMIN", "ROLE_EMPLEADO", "ROLE_CLIENTE", "ROLE_USER");
+        List<String> rolesToInitialize = List.of("ROLE_ADMIN", "ROLE_EMPLEADO", "ROLE_CLIENTE", "ROLE_USER", "ROLE_DESIGNER");
 
         rolesToInitialize.forEach(nombreRol -> {
             if (rolRepository.findByNombre(nombreRol).isEmpty()) {
