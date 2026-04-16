@@ -46,19 +46,28 @@ Gestión de usuarios, seguridad y tokens JWT.
 
 ---
 
-## 🔄 2. Workflows y Tareas (Próximamente)
+## 🔄 2. Workflows y Tareas
 
-El sistema ya cuenta con los modelos en MongoDB listos para implementar los siguientes flujos:
+Gestión de procesos de negocio y sus instancias.
 
-### Flujo de Tarea (Diseño)
-- **Datos Dinámicos**: El campo `datos` permite guardar cualquier estructura de formulario.
-- **Historial**: Cada acción queda registrada con usuario, fecha y detalle.
+### Listar Workflows
+- **Método:** `GET`
+- **Ruta:** `/api/workflows`
+- **Descripción:** Devuelve todos los procesos definidos (ej. Vacaciones, Compras).
 
-| Entidad | Propósito |
-| :--- | :--- |
-| **Workflow** | Define los pasos y reglas de un proceso. |
-| **Formulario** | Define los campos (input) que requiere cada paso. |
-| **Tarea** | Es una instancia viva de un workflow asignada a un usuario. |
+### Ver Detalle de Workflow
+- **Método:** `GET`
+- **Ruta:** `/api/workflows/{id}`
+
+### Ver Formulario
+- **Método:** `GET`
+- **Ruta:** `/api/formularios/{id}`
+- **Descripción:** Obtiene los campos necesarios para un paso específico del workflow.
+
+---
+
+## 📋 3. Tareas (Próximamente)
+Las tareas representan instancias de workflows en ejecución.
 
 ---
 
@@ -67,8 +76,8 @@ Usa **Swagger UI** para probar las rutas sin herramientas externas:
 
 Acceso:
 ```text
-http://localhost:8080/swagger-ui/index.html
+http://localhost:8081/swagger-ui/index.html
 ```
 
 > [!IMPORTANT]
-> Para usar las rutas protegidas, primero haz **Login**, copia el token y pégalo en el botón **Authorize** de Swagger con el formato: `Bearer TU_TOKEN_AQUI`.
+> Para usar las rutas de Workflows, primero haz **Login** con el usuario admin (`admin@workflow.com`), copia el token y pégalo en el botón **Authorize** de Swagger con el formato: `Bearer TU_TOKEN_AQUI`.
