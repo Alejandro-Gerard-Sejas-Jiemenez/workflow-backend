@@ -25,6 +25,8 @@ public class Tarea {
 
     private String asignadoA;
 
+    private String prioridad; // ALTA | MEDIA | BAJA (asignado por IA)
+
     private Map<String, Object> datos;
 
     private List<Historial> historial;

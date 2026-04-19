@@ -1,6 +1,7 @@
 package com.sw.api.controllers;
 
 import com.sw.api.dtos.IaAnalisisResponseDTO;
+import com.sw.api.dtos.TareaResponseDTO;
 import com.sw.api.services.IaAnalisisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,5 +23,15 @@ public class IaAnalisisController {
     @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
     public ResponseEntity<IaAnalisisResponseDTO> analizarConIA(@PathVariable String id) {
         return ResponseEntity.ok(iaAnalisisService.analizarTarea(id));
+    }
+
+    /**
+     * CU13: El Funcionario solicita priorización automática de una tarea
+     * POST /api/tareas/{id}/priorizar — persiste ALTA | MEDIA | BAJA en MongoDB
+     */
+    @PostMapping("/{id}/priorizar")
+    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    public ResponseEntity<TareaResponseDTO> priorizarConIA(@PathVariable String id) {
+        return ResponseEntity.ok(iaAnalisisService.priorizarTarea(id));
     }
 }

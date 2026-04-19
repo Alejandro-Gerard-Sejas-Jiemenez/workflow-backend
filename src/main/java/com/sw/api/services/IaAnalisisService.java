@@ -3,6 +3,7 @@ package com.sw.api.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sw.api.dtos.IaAnalisisResponseDTO;
+import com.sw.api.dtos.TareaResponseDTO;
 import com.sw.api.models.Tarea;
 import com.sw.api.repositories.TareaRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,70 @@ public class IaAnalisisService {
 
         // Parsear y estructurar la respuesta
         return parsearRespuesta(tareaId, respuestaIA, tarea.getDatos());
+    }
+
+    public TareaResponseDTO priorizarTarea(String tareaId) {
+        Tarea tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + tareaId));
+
+        String prompt = buildPromptPrioridad(tarea);
+        String respuestaIA = llamarGemini(prompt);
+
+        // Extraer la prioridad de la respuesta: esperamos ALTA, MEDIA o BAJA
+        String prioridad = extraerPrioridad(respuestaIA);
+        tarea.setPrioridad(prioridad);
+
+        Tarea guardada = tareaRepository.save(tarea);
+        return new TareaResponseDTO(
+                guardada.getId(),
+                guardada.getWorkflowId(),
+                guardada.getEstado(),
+                guardada.getPasoActual(),
+                guardada.getAsignadoA(),
+                guardada.getPrioridad(),
+                guardada.getDatos(),
+                guardada.getHistorial()
+        );
+    }
+
+    private String buildPromptPrioridad(Tarea tarea) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Eres un clasificador experto de prioridades en procesos empresariales. ");
+        sb.append("Analiza los datos de la siguiente tarea y determina su nivel de prioridad.\n\n");
+        sb.append("=== DATOS DE LA TAREA ===\n");
+        sb.append("Estado: ").append(tarea.getEstado()).append("\n");
+        sb.append("Paso actual: ").append(tarea.getPasoActual()).append("\n");
+        sb.append("Assigned to: ").append(tarea.getAsignadoA()).append("\n");
+        sb.append("\n=== DATOS DEL FORMULARIO ===\n");
+        if (tarea.getDatos() != null) {
+            tarea.getDatos().forEach((k, v) -> sb.append("- ").append(k).append(": ").append(v).append("\n"));
+        }
+        sb.append("\n=== HISTORIAL ===\n");
+        if (tarea.getHistorial() != null) {
+            sb.append("Cantidad de eventos: ").append(tarea.getHistorial().size()).append("\n");
+        }
+        sb.append("\n=== INSTRUCCIÓN ===\n");
+        sb.append("Clasifica la prioridad de esta tarea como exactamente una de estas opciones: ALTA, MEDIA o BAJA.\n");
+        sb.append("Considera factores como: montos elevados, urgencia implícita en los datos, cantidad de pasos ya ejecutados.\n");
+        sb.append("Responde ÚNICAMENTE con el formato exacto:\n");
+        sb.append("PRIORIDAD: [ALTA|MEDIA|BAJA]\n");
+        sb.append("JUSTIFICACION: [una sola frase explicando el motivo]\n");
+        return sb.toString();
+    }
+
+    private String extraerPrioridad(String respuesta) {
+        try {
+            if (respuesta.contains("PRIORIDAD:")) {
+                String linea = respuesta.lines()
+                        .filter(l -> l.startsWith("PRIORIDAD:"))
+                        .findFirst().orElse("");
+                String valor = linea.replace("PRIORIDAD:", "").trim().toUpperCase();
+                if (valor.contains("ALTA")) return "ALTA";
+                if (valor.contains("BAJA")) return "BAJA";
+                return "MEDIA"; // default seguro
+            }
+        } catch (Exception ignored) {}
+        return "MEDIA";
     }
 
     private String buildPrompt(Tarea tarea) {

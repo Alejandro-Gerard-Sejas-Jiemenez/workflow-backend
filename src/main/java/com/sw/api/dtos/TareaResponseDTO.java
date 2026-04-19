@@ -10,6 +10,7 @@ public record TareaResponseDTO(
     String estado,
     Integer pasoActual,
     String asignadoA,
+    String prioridad,
     Map<String, Object> datos,
     List<Tarea.Historial> historial
 ) {}

@@ -168,6 +168,7 @@ public class TareaService {
                 t.getEstado(),
                 t.getPasoActual(),
                 t.getAsignadoA(),
+                t.getPrioridad(),
                 t.getDatos(),
                 t.getHistorial()
         );
