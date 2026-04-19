@@ -91,12 +91,15 @@ public class AuthService {
         return new AuthResponse(jwtToken);
     }
 
-    public void logout(String email) {
+    public void processLogout(String token) {
+        String email = jwtService.extractUsername(token);
         var user = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         
         user.setEstadoConexion(false);
         usuarioRepository.save(user);
+
+        jwtService.blacklistToken(token);
     }
 
     public AuthResponse actualizarToken(RefreshTokenRequest request) {

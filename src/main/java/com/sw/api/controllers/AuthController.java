@@ -10,6 +10,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -54,10 +56,29 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
-        // En un mundo ideal, extraemos el email del token o context
-        // Pero para simplificar y cumplir con el requisito de cerrar sesión:
-        // El cliente simplemente debe eliminar el token
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        String jwt = null;
+        
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("jwt_token".equals(cookie.getName())) {
+                    jwt = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        
+        if (jwt == null) {
+            final String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                jwt = authHeader.substring(7);
+            }
+        }
+
+        if (jwt != null) {
+            authService.processLogout(jwt);
+        }
+
         return ResponseEntity.ok()
                 .headers(limpiarCookie())
                 .build();

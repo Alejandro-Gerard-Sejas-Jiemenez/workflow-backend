@@ -53,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Si después de buscar en ambos lados no hay token, dejamos pasar la petición 
         // (Spring Security la bloqueará más adelante si la ruta era privada)
-        if (jwt == null) {
+        if (jwt == null || jwtService.isTokenBlacklisted(jwt)) {
             filterChain.doFilter(request, response);
             return;
         }

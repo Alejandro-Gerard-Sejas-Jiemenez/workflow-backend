@@ -13,9 +13,16 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class JwtService {
+
+    private final StringRedisTemplate redisTemplate;
 
     // Esta llave secreta la pondremos en el application.properties enseguida
     @Value("${jwt.secret}")
@@ -71,5 +78,18 @@ public class JwtService {
     private SecretKey getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public void blacklistToken(String token) {
+        Date expiration = extractExpiration(token);
+        long remainingTime = expiration.getTime() - System.currentTimeMillis();
+        
+        if (remainingTime > 0) {
+            redisTemplate.opsForValue().set(token, "blacklisted", remainingTime, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    public boolean isTokenBlacklisted(String token) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(token));
     }
 }
