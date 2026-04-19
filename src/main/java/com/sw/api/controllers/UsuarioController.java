@@ -38,11 +38,13 @@ public class UsuarioController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UsuarioResponseDTO> obtenerUsuario(@PathVariable String id) {
         return ResponseEntity.ok(usuarioService.obtenerPorId(id));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UsuarioResponseDTO> actualizarUsuario(
             @PathVariable String id, 
             @RequestBody UsuarioUpdateDTO dto) {
@@ -50,12 +52,14 @@ public class UsuarioController {
     }
 
     @PutMapping("/{id}/restaurar")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> restaurarUsuario(@PathVariable String id) {
         usuarioService.restaurar(id);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> eliminarUsuario(@PathVariable String id) {
         usuarioService.eliminar(id);
         return ResponseEntity.noContent().build();
