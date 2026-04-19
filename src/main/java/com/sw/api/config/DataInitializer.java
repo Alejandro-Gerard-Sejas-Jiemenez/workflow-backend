@@ -71,10 +71,10 @@ public class DataInitializer implements CommandLineRunner {
             Formulario formVacaciones = new Formulario();
             formVacaciones.setNombre("Solicitud de Vacaciones");
             formVacaciones.setCampos(List.of(
-                new Formulario.Campo("fecha_inicio", "date", true),
-                new Formulario.Campo("fecha_fin", "date", true),
-                new Formulario.Campo("motivo", "text", true),
-                new Formulario.Campo("comentarios", "text", false)
+                new Formulario.Campo("fecha_inicio", "date", true, null),
+                new Formulario.Campo("fecha_fin", "date", true, null),
+                new Formulario.Campo("motivo", "text", true, null),
+                new Formulario.Campo("comentarios", "text", false, null)
             ));
             formVacaciones = formularioRepository.save(formVacaciones);
             System.out.println("✅ Formulario de Vacaciones creado.");

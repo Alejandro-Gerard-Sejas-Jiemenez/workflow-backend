@@ -1,6 +1,7 @@
 package com.sw.api.controllers;
 
 import com.sw.api.dtos.TareaCreateDTO;
+import com.sw.api.dtos.TareaAvanceDTO;
 import com.sw.api.dtos.TareaResponseDTO;
 import com.sw.api.services.TareaService;
 import jakarta.validation.Valid;
@@ -25,5 +26,14 @@ public class TareaController {
             @Valid @RequestBody TareaCreateDTO dto) {
         // principal.getName() devuelve el email que inyectó nuestro JWT Filter
         return ResponseEntity.ok(tareaService.iniciarTarea(dto, principal.getName()));
+    }
+
+    @PostMapping("/{id}/gestionar")
+    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    public ResponseEntity<TareaResponseDTO> gestionarTarea(
+            @PathVariable String id,
+            @Valid @RequestBody TareaAvanceDTO dto,
+            Principal principal) {
+        return ResponseEntity.ok(tareaService.gestionarTarea(id, dto, principal.getName()));
     }
 }
