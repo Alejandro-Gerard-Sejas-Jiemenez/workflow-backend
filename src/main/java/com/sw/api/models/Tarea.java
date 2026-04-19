@@ -31,6 +31,8 @@ public class Tarea {
 
     private List<Historial> historial;
 
+    private List<Comentario> comentarios;
+
     @Getter
     @Setter
     @NoArgsConstructor
@@ -39,6 +41,19 @@ public class Tarea {
         private String usuarioId;
         private String accion;
         private String detalle;
+        private LocalDateTime fecha;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Comentario {
+        private String id;           // UUID generado en código
+        private String usuarioId;    // Quién comenta
+        private String contenido;    // Texto del comentario
+        private List<String> menciones; // @usuarioIds mencionados
+        private String archivoUrl;   // URL en Cloudinary (opcional)
         private LocalDateTime fecha;
     }
 }
