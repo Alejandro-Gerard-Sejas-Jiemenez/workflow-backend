@@ -2,6 +2,7 @@ package com.sw.api.controllers;
 
 import com.sw.api.dtos.WorkflowCreateDTO;
 import com.sw.api.dtos.WorkflowPasosUpdateDTO;
+import com.sw.api.dtos.WorkflowReglasUpdateDTO;
 import com.sw.api.dtos.WorkflowResponseDTO;
 import com.sw.api.services.WorkflowService;
 import jakarta.validation.Valid;
@@ -31,6 +32,14 @@ public class WorkflowController {
             @PathVariable String id, 
             @Valid @RequestBody WorkflowPasosUpdateDTO dto) {
         return ResponseEntity.ok(workflowService.actualizarPasos(id, dto));
+    }
+
+    @PutMapping("/{id}/reglas")
+    @PreAuthorize("hasAuthority('ROLE_DESIGNER')")
+    public ResponseEntity<WorkflowResponseDTO> actualizarReglas(
+            @PathVariable String id, 
+            @Valid @RequestBody WorkflowReglasUpdateDTO dto) {
+        return ResponseEntity.ok(workflowService.actualizarReglas(id, dto));
     }
 
     @GetMapping
