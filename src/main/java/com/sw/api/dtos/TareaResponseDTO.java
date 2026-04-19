@@ -1,0 +1,15 @@
+package com.sw.api.dtos;
+
+import java.util.List;
+import java.util.Map;
+import com.sw.api.models.Tarea;
+
+public record TareaResponseDTO(
+    String id,
+    String workflowId,
+    String estado,
+    Integer pasoActual,
+    String asignadoA,
+    Map<String, Object> datos,
+    List<Tarea.Historial> historial
+) {}
