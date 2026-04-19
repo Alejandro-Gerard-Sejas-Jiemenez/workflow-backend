@@ -1,7 +1,9 @@
 package com.sw.api.controllers;
 
-import com.sw.api.models.Formulario;
+import com.sw.api.dtos.FormularioCreateDTO;
+import com.sw.api.dtos.FormularioResponseDTO;
 import com.sw.api.services.FormularioService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,15 +18,21 @@ public class FormularioController {
 
     private final FormularioService formularioService;
 
+    @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_DESIGNER')")
+    public ResponseEntity<FormularioResponseDTO> crearFormulario(@Valid @RequestBody FormularioCreateDTO dto) {
+        return ResponseEntity.ok(formularioService.crear(dto));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_DESIGNER')")
-    public ResponseEntity<List<Formulario>> obtenerTodos() {
+    public ResponseEntity<List<FormularioResponseDTO>> obtenerTodos() {
         return ResponseEntity.ok(formularioService.obtenerTodos());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE', 'ROLE_DESIGNER')")
-    public ResponseEntity<Formulario> obtenerPorId(@PathVariable String id) {
+    public ResponseEntity<FormularioResponseDTO> obtenerPorId(@PathVariable String id) {
         return ResponseEntity.ok(formularioService.obtenerPorId(id));
     }
 }
