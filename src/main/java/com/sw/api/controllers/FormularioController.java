@@ -1,6 +1,7 @@
 package com.sw.api.controllers;
 
 import com.sw.api.dtos.FormularioCreateDTO;
+import com.sw.api.dtos.FormularioCamposUpdateDTO;
 import com.sw.api.dtos.FormularioResponseDTO;
 import com.sw.api.services.FormularioService;
 import jakarta.validation.Valid;
@@ -22,6 +23,14 @@ public class FormularioController {
     @PreAuthorize("hasAuthority('ROLE_DESIGNER')")
     public ResponseEntity<FormularioResponseDTO> crearFormulario(@Valid @RequestBody FormularioCreateDTO dto) {
         return ResponseEntity.ok(formularioService.crear(dto));
+    }
+
+    @PutMapping("/{id}/campos")
+    @PreAuthorize("hasAuthority('ROLE_DESIGNER')")
+    public ResponseEntity<FormularioResponseDTO> actualizarCampos(
+            @PathVariable String id, 
+            @Valid @RequestBody FormularioCamposUpdateDTO dto) {
+        return ResponseEntity.ok(formularioService.actualizarCampos(id, dto));
     }
 
     @GetMapping

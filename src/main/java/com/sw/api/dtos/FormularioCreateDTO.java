@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.Map;
 
 public record FormularioCreateDTO(
     @NotBlank(message = "El nombre del formulario es obligatorio")
@@ -22,7 +23,9 @@ public record FormularioCreateDTO(
         @NotBlank(message = "El tipo de campo es obligatorio")
         String tipo,
 
-        Boolean requerido
+        Boolean requerido,
+        
+        Map<String, Object> opciones
     ) {
         public boolean isRequerido() {
             return requerido != null ? requerido : false;

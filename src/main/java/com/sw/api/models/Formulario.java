@@ -4,6 +4,7 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
+import java.util.Map;
 
 @Document(collection = "formularios")
 @Getter
@@ -29,5 +30,6 @@ public class Formulario {
         private String nombre;
         private String tipo;
         private boolean requerido;
+        private Map<String, Object> opciones;
     }
 }
