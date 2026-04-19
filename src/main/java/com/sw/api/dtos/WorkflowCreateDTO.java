@@ -32,7 +32,6 @@ public record WorkflowCreateDTO(
         @NotBlank(message = "El departamento es obligatorio")
         String departamento,
 
-        @NotBlank(message = "El formularioId es obligatorio")
         String formularioId
     ) {}
 

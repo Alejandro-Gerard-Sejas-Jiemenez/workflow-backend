@@ -1,6 +1,7 @@
 package com.sw.api.controllers;
 
 import com.sw.api.dtos.WorkflowCreateDTO;
+import com.sw.api.dtos.WorkflowPasosUpdateDTO;
 import com.sw.api.dtos.WorkflowResponseDTO;
 import com.sw.api.services.WorkflowService;
 import jakarta.validation.Valid;
@@ -22,6 +23,14 @@ public class WorkflowController {
     @PreAuthorize("hasAuthority('ROLE_DESIGNER')")
     public ResponseEntity<WorkflowResponseDTO> crearWorkflow(@Valid @RequestBody WorkflowCreateDTO dto) {
         return ResponseEntity.ok(workflowService.crear(dto));
+    }
+
+    @PutMapping("/{id}/pasos")
+    @PreAuthorize("hasAuthority('ROLE_DESIGNER')")
+    public ResponseEntity<WorkflowResponseDTO> actualizarPasos(
+            @PathVariable String id, 
+            @Valid @RequestBody WorkflowPasosUpdateDTO dto) {
+        return ResponseEntity.ok(workflowService.actualizarPasos(id, dto));
     }
 
     @GetMapping
