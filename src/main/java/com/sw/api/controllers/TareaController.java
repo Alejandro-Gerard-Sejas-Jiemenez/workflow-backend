@@ -1,8 +1,11 @@
 package com.sw.api.controllers;
 
+import com.sw.api.dtos.ComentarioCreateDTO;
+import com.sw.api.dtos.ComentarioResponseDTO;
 import com.sw.api.dtos.TareaCreateDTO;
 import com.sw.api.dtos.TareaAvanceDTO;
 import com.sw.api.dtos.TareaResponseDTO;
+import com.sw.api.services.ColaboracionService;
 import com.sw.api.services.TareaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/tareas")
@@ -18,6 +22,7 @@ import java.security.Principal;
 public class TareaController {
 
     private final TareaService tareaService;
+    private final ColaboracionService colaboracionService;
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_CLIENTE', 'ROLE_EMPLEADO')")
@@ -35,5 +40,20 @@ public class TareaController {
             @Valid @RequestBody TareaAvanceDTO dto,
             Principal principal) {
         return ResponseEntity.ok(tareaService.gestionarTarea(id, dto, principal.getName()));
+    }
+
+    @PostMapping("/{id}/comentarios")
+    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    public ResponseEntity<ComentarioResponseDTO> agregarComentario(
+            @PathVariable String id,
+            @Valid @RequestBody ComentarioCreateDTO dto,
+            Principal principal) {
+        return ResponseEntity.ok(colaboracionService.agregarComentario(id, dto, principal.getName()));
+    }
+
+    @GetMapping("/{id}/comentarios")
+    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    public ResponseEntity<List<ComentarioResponseDTO>> listarComentarios(@PathVariable String id) {
+        return ResponseEntity.ok(colaboracionService.listarComentarios(id));
     }
 }

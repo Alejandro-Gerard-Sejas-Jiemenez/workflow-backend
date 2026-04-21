@@ -5,6 +5,7 @@ import com.sw.api.dtos.WorkflowCreateDTO;
 import com.sw.api.dtos.WorkflowResponseDTO;
 import com.sw.api.dtos.WorkflowPasosUpdateDTO;
 import com.sw.api.dtos.WorkflowReglasUpdateDTO;
+import com.sw.api.dtos.WorkflowDiagramUpdateDTO;
 import com.sw.api.repositories.WorkflowRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class WorkflowService {
             new Workflow.Regla(r.condicion(), r.accion())
         ).collect(Collectors.toList());
         workflow.setReglas(reglas);
+        workflow.setDiagramData(dto.diagramData());
 
         return mapToDTO(workflowRepository.save(workflow));
     }
@@ -60,6 +62,14 @@ public class WorkflowService {
         return mapToDTO(workflowRepository.save(workflow));
     }
 
+    public WorkflowResponseDTO actualizarDiagrama(String id, WorkflowDiagramUpdateDTO dto) {
+        Workflow workflow = workflowRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Workflow no encontrado con ID: " + id));
+
+        workflow.setDiagramData(dto.diagramData());
+        return mapToDTO(workflowRepository.save(workflow));
+    }
+
     public List<WorkflowResponseDTO> obtenerTodos() {
         return workflowRepository.findAll().stream()
                 .map(this::mapToDTO)
@@ -78,7 +88,8 @@ public class WorkflowService {
             w.getNombre(),
             w.getDescripcion(),
             w.getPasos(),
-            w.getReglas()
+            w.getReglas(),
+            w.getDiagramData()
         );
     }
 }

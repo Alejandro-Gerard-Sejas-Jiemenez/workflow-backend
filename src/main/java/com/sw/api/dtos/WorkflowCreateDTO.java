@@ -20,7 +20,9 @@ public record WorkflowCreateDTO(
 
     @NotNull(message = "La lista de reglas no puede ser nula")
     @Valid
-    List<ReglaCreateDTO> reglas
+    List<ReglaCreateDTO> reglas,
+
+    String diagramData
 ) {
     public record PasoCreateDTO(
         @NotBlank(message = "El nombre del paso es obligatorio")

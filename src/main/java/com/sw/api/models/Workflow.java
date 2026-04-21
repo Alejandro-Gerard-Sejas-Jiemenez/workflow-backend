@@ -22,6 +22,8 @@ public class Workflow {
     private List<Paso> pasos;
 
     private List<Regla> reglas;
+    
+    private String diagramData;
 
     @Getter
     @Setter

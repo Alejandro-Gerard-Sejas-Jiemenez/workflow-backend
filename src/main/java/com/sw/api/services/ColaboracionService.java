@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,7 +26,7 @@ public class ColaboracionService {
     private final UsuarioRepository usuarioRepository;
     private final NotificacionRepository notificacionRepository;
 
-    /** Agregar comentario a una tarea (con soporte de menciones y archivos) */
+    /** Agregar comentario a una tarea con soporte de menciones y archivos */
     public ComentarioResponseDTO agregarComentario(String tareaId, ComentarioCreateDTO dto, String username) {
         Tarea tarea = tareaRepository.findById(tareaId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + tareaId));
@@ -33,35 +34,44 @@ public class ColaboracionService {
         Usuario autor = usuarioRepository.findByEmail(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Construir el comentario embebido
+        List<String> menciones = normalizarMenciones(dto.menciones(), autor.getId());
+        LocalDateTime fechaComentario = LocalDateTime.now();
+
         Tarea.Comentario comentario = new Tarea.Comentario(
                 UUID.randomUUID().toString(),
                 autor.getId(),
                 dto.contenido(),
-                dto.menciones() != null ? dto.menciones() : new ArrayList<>(),
+                menciones,
                 dto.archivoUrl(),
-                LocalDateTime.now()
+                fechaComentario
         );
 
-        // Inicializar lista si es el primer comentario
         if (tarea.getComentarios() == null) {
             tarea.setComentarios(new ArrayList<>());
         }
         tarea.getComentarios().add(comentario);
+
+        if (tarea.getHistorial() == null) {
+            tarea.setHistorial(new ArrayList<>());
+        }
+        tarea.getHistorial().add(new Tarea.Historial(
+                autor.getId(),
+                "COMENTARIO_TAREA",
+                "Se agrego un comentario colaborativo a la tarea",
+                fechaComentario
+        ));
+
         tareaRepository.save(tarea);
 
-        // Disparar notificaciones a los mencionados
-        if (dto.menciones() != null) {
-            dto.menciones().forEach(mencionadoId -> {
-                Notificacion notif = new Notificacion();
-                notif.setUsuarioId(mencionadoId);
-                notif.setMensaje(autor.getNombre() + " te mencionó en la tarea " + tareaId);
-                notif.setTipo("MENCION");
-                notif.setLeido(false);
-                notif.setFecha(LocalDateTime.now());
-                notificacionRepository.save(notif);
-            });
-        }
+        menciones.forEach(mencionadoId -> {
+            Notificacion notif = new Notificacion();
+            notif.setUsuarioId(mencionadoId);
+            notif.setMensaje(autor.getNombre() + " te menciono en la tarea " + tareaId);
+            notif.setTipo("MENCION_TAREA");
+            notif.setLeido(false);
+            notif.setFecha(fechaComentario);
+            notificacionRepository.save(notif);
+        });
 
         return mapComentarioToDTO(comentario);
     }
@@ -71,21 +81,38 @@ public class ColaboracionService {
         Tarea tarea = tareaRepository.findById(tareaId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + tareaId));
 
-        if (tarea.getComentarios() == null) return new ArrayList<>();
+        if (tarea.getComentarios() == null) {
+            return new ArrayList<>();
+        }
 
         return tarea.getComentarios().stream()
                 .map(this::mapComentarioToDTO)
                 .collect(Collectors.toList());
     }
 
-    private ComentarioResponseDTO mapComentarioToDTO(Tarea.Comentario c) {
+    private ComentarioResponseDTO mapComentarioToDTO(Tarea.Comentario comentario) {
         return new ComentarioResponseDTO(
-                c.getId(),
-                c.getUsuarioId(),
-                c.getContenido(),
-                c.getMenciones(),
-                c.getArchivoUrl(),
-                c.getFecha()
+                comentario.getId(),
+                comentario.getUsuarioId(),
+                comentario.getContenido(),
+                comentario.getMenciones(),
+                comentario.getArchivoUrl(),
+                comentario.getFecha()
         );
+    }
+
+    private List<String> normalizarMenciones(List<String> menciones, String autorId) {
+        if (menciones == null || menciones.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return new LinkedHashSet<>(menciones).stream()
+                .filter(mencionadoId -> !mencionadoId.equals(autorId))
+                .peek(mencionadoId -> {
+                    if (!usuarioRepository.existsById(mencionadoId)) {
+                        throw new RuntimeException("Usuario mencionado no encontrado: " + mencionadoId);
+                    }
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 }
