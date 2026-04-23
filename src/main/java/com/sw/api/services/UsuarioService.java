@@ -34,11 +34,9 @@ public class UsuarioService {
 
         Usuario usuario = new Usuario();
         usuario.setNombre(dto.nombre());
-        usuario.setApellido(dto.apellido());
         usuario.setEmail(dto.email());
         usuario.setPassword(passwordEncoder.encode(dto.password()));
         usuario.setDepartamento(dto.departamento());
-        usuario.setTelefono(dto.telefono());
         usuario.setRol(rol);
         usuario.setActivo(true);
 
@@ -57,6 +55,13 @@ public class UsuarioService {
                 .collect(Collectors.toList());
     }
 
+    public List<UsuarioResponseDTO> obtenerDesigners() {
+        return usuarioRepository.findAllByActivoTrue().stream()
+                .filter(usuario -> usuario.getRol() != null && "ROLE_DESIGNER".equals(usuario.getRol().getNombre()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
     public UsuarioResponseDTO obtenerPorId(String id) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
@@ -67,11 +72,11 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
-        if (dto.nombre() != null) usuario.setNombre(dto.nombre());
-        if (dto.apellido() != null) usuario.setApellido(dto.apellido());
-        if (dto.departamento() != null) usuario.setDepartamento(dto.departamento());
-        if (dto.telefono() != null) usuario.setTelefono(dto.telefono());
-        
+        if (dto.nombre() != null)
+            usuario.setNombre(dto.nombre());
+        if (dto.departamento() != null)
+            usuario.setDepartamento(dto.departamento());
+
         if (dto.rolId() != null) {
             Rol rol = rolRepository.findById(dto.rolId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rol no encontrado"));
@@ -84,7 +89,7 @@ public class UsuarioService {
     public void eliminar(String id) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-        
+
         usuario.setActivo(false);
         usuarioRepository.save(usuario);
     }
@@ -92,7 +97,7 @@ public class UsuarioService {
     public void restaurar(String id) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-        
+
         usuario.setActivo(true);
         usuarioRepository.save(usuario);
     }
@@ -102,12 +107,9 @@ public class UsuarioService {
                 usuario.getId(),
                 usuario.getEmail(),
                 usuario.getNombre(),
-                usuario.getApellido(),
                 usuario.getDepartamento(),
-                usuario.getTelefono(),
                 (usuario.getRol() != null) ? usuario.getRol().getNombre() : "SIN_ROL",
                 usuario.isEstadoConexion(),
-                usuario.getUltimaConexion()
-        );
+                usuario.getUltimaConexion());
     }
 }

@@ -37,6 +37,12 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.obtenerInactivos());
     }
 
+    @GetMapping("/designers")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_DESIGNER')")
+    public ResponseEntity<List<UsuarioResponseDTO>> obtenerDesigners() {
+        return ResponseEntity.ok(usuarioService.obtenerDesigners());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UsuarioResponseDTO> obtenerUsuario(@PathVariable String id) {

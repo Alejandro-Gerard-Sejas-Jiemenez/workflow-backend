@@ -25,6 +25,10 @@ public class Workflow {
     
     private String diagramData;
 
+    private String ownerUserId;
+
+    private List<Collaborator> collaborators;
+
     @Getter
     @Setter
     @NoArgsConstructor
@@ -43,5 +47,14 @@ public class Workflow {
     public static class Regla {
         private String condicion;
         private String accion;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Collaborator {
+        private String userId;
+        private String role;
     }
 }

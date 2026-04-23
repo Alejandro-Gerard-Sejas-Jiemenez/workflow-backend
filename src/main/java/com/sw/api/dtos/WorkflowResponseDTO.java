@@ -11,5 +11,7 @@ public record WorkflowResponseDTO(
     List<Workflow.Paso> pasos,
     @Valid
     List<Workflow.Regla> reglas,
-    String diagramData
+    String diagramData,
+    String ownerUserId,
+    List<WorkflowCollaboratorDTO> collaborators
 ) {}

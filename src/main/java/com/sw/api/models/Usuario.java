@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
-@Getter @Setter
+@Getter
+@Setter
 @Document(collection = "usuarios")
 public class Usuario extends Auditable implements UserDetails {
 
@@ -21,25 +22,21 @@ public class Usuario extends Auditable implements UserDetails {
 
     private String nombre;
 
-    private String apellido;
-
     private String email;
 
     private String password;
 
     private String departamento;
 
-    private String telefono;
-
     private boolean activo = true;
 
     private boolean estadoConexion = false;
 
     private LocalDateTime ultimaConexion;
-    
+
     @DBRef
     private Rol rol;
-    
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         String roleName = "ROLE_USER";
@@ -51,23 +48,31 @@ public class Usuario extends Auditable implements UserDetails {
 
     @Override
     public String getPassword() {
-        return this.password; 
+        return this.password;
     }
 
     @Override
     public String getUsername() {
-        return this.email; 
+        return this.email;
     }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
 
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public boolean isAccountNonLocked() {
+        return true;
+    }
 
     @Override
-    public boolean isCredentialsNonExpired() { return true; }
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
 
     @Override
-    public boolean isEnabled() { return this.activo; }
+    public boolean isEnabled() {
+        return this.activo;
+    }
 }

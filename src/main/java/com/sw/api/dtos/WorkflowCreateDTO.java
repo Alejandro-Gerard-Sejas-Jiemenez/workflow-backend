@@ -14,7 +14,6 @@ public record WorkflowCreateDTO(
     String descripcion,
 
     @NotNull(message = "La lista de pasos no puede ser nula")
-    @Size(min = 1, message = "Debe haber al menos un paso en el workflow")
     @Valid
     List<PasoCreateDTO> pasos,
 

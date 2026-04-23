@@ -34,7 +34,8 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initializeRoles() {
-        List<String> rolesToInitialize = List.of("ROLE_ADMIN", "ROLE_EMPLEADO", "ROLE_CLIENTE", "ROLE_USER", "ROLE_DESIGNER");
+        List<String> rolesToInitialize = List.of("ROLE_ADMIN", "ROLE_EMPLEADO", "ROLE_CLIENTE", "ROLE_USER",
+                "ROLE_DESIGNER");
 
         rolesToInitialize.forEach(nombreRol -> {
             if (rolRepository.findByNombre(nombreRol).isEmpty()) {
@@ -53,7 +54,6 @@ public class DataInitializer implements CommandLineRunner {
 
             Usuario admin = new Usuario();
             admin.setNombre("Admin");
-            admin.setApellido("Sistema");
             admin.setEmail(adminEmail);
             admin.setPassword(passwordEncoder.encode("admin123"));
             admin.setDepartamento("TI");
@@ -71,11 +71,10 @@ public class DataInitializer implements CommandLineRunner {
             Formulario formVacaciones = new Formulario();
             formVacaciones.setNombre("Solicitud de Vacaciones");
             formVacaciones.setCampos(List.of(
-                new Formulario.Campo("fecha_inicio", "date", true, null),
-                new Formulario.Campo("fecha_fin", "date", true, null),
-                new Formulario.Campo("motivo", "text", true, null),
-                new Formulario.Campo("comentarios", "text", false, null)
-            ));
+                    new Formulario.Campo("fecha_inicio", "date", true, null),
+                    new Formulario.Campo("fecha_fin", "date", true, null),
+                    new Formulario.Campo("motivo", "text", true, null),
+                    new Formulario.Campo("comentarios", "text", false, null)));
             formVacaciones = formularioRepository.save(formVacaciones);
             System.out.println("✅ Formulario de Vacaciones creado.");
 
@@ -84,12 +83,12 @@ public class DataInitializer implements CommandLineRunner {
                 Workflow workflowVacaciones = new Workflow();
                 workflowVacaciones.setNombre("Gestion de Vacaciones");
                 workflowVacaciones.setDescripcion("Proceso estandar para la solicitud y aprobacion de dias libres.");
-                
+
                 List<Workflow.Paso> pasos = new ArrayList<>();
                 pasos.add(new Workflow.Paso("Solicitud", 1, "CLIENTE", formVacaciones.getId()));
                 pasos.add(new Workflow.Paso("Revision RRHH", 2, "EMPLEADO", formVacaciones.getId()));
                 pasos.add(new Workflow.Paso("Aprobacion Final", 3, "ADMIN", formVacaciones.getId()));
-                
+
                 workflowVacaciones.setPasos(pasos);
                 workflowRepository.save(workflowVacaciones);
                 System.out.println("✅ Workflow de Vacaciones creado.");

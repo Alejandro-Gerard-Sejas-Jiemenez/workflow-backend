@@ -36,7 +36,7 @@ public class SecurityConfig {
                                                 // Dejamos públicas las rutas de registro, login y la documentación de
                                                 // Swagger
                                                 .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
-                                                                "/swagger-ui.html")
+                                                                "/swagger-ui.html", "/ws/**")
                                                 .permitAll()
                                                 // Cualquier otra petición a la API exigirá un token válido
                                                 .anyRequest().authenticated())

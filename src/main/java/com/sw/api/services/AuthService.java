@@ -48,9 +48,7 @@ public class AuthService {
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setEmail(request.email());
         nuevoUsuario.setNombre(request.nombre());
-        nuevoUsuario.setApellido(request.apellido());
         nuevoUsuario.setDepartamento(request.departamento());
-        nuevoUsuario.setTelefono(request.telefono());
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
         nuevoUsuario.setEstadoConexion(true);
         nuevoUsuario.setUltimaConexion(LocalDateTime.now());
@@ -61,7 +59,6 @@ public class AuthService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", usuarioGuardado.getId());
         extraClaims.put("nombre", usuarioGuardado.getNombre());
-        extraClaims.put("apellido", usuarioGuardado.getApellido());
         extraClaims.put("rol", usuarioGuardado.getRol().getNombre());
 
         var jwtToken = jwtService.generarToken(extraClaims, usuarioGuardado);
@@ -73,7 +70,8 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
 
         var user = usuarioRepository.findByEmailAndActivoTrue(request.email())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado o inactivo"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado o inactivo"));
 
         // Actualizar estado de conexión
         user.setEstadoConexion(true);
@@ -83,10 +81,9 @@ public class AuthService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
         extraClaims.put("nombre", user.getNombre());
-        extraClaims.put("apellido", user.getApellido());
         String nombreRol = (user.getRol() != null) ? user.getRol().getNombre() : "SIN_ROL";
         extraClaims.put("rol", nombreRol);
-        
+
         var jwtToken = jwtService.generarToken(extraClaims, user);
         return new AuthResponse(jwtToken);
     }
@@ -95,7 +92,7 @@ public class AuthService {
         String email = jwtService.extractUsername(token);
         var user = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-        
+
         user.setEstadoConexion(false);
         usuarioRepository.save(user);
 
@@ -125,7 +122,6 @@ public class AuthService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
         extraClaims.put("nombre", user.getNombre());
-        extraClaims.put("apellido", user.getApellido());
         String nombreRol = (user.getRol() != null) ? user.getRol().getNombre() : "SIN_ROL";
         extraClaims.put("rol", nombreRol);
 
