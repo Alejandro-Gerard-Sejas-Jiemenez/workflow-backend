@@ -6,6 +6,7 @@ import com.sw.api.dtos.WorkflowCollaboratorDTO;
 import com.sw.api.dtos.WorkflowPasosUpdateDTO;
 import com.sw.api.dtos.WorkflowReglasUpdateDTO;
 import com.sw.api.dtos.WorkflowDiagramUpdateDTO;
+import com.sw.api.dtos.WorkflowEstadoUpdateDTO;
 import com.sw.api.dtos.WorkflowResponseDTO;
 import com.sw.api.services.WorkflowService;
 import jakarta.validation.Valid;
@@ -51,6 +52,14 @@ public class WorkflowController {
             @PathVariable String id, 
             @Valid @RequestBody WorkflowDiagramUpdateDTO dto) {
         return ResponseEntity.ok(workflowService.actualizarDiagrama(id, dto));
+    }
+
+    @PutMapping("/{id}/estado")
+    @PreAuthorize("hasAnyAuthority('ROLE_DESIGNER', 'ROLE_ADMIN')")
+    public ResponseEntity<WorkflowResponseDTO> actualizarEstado(
+            @PathVariable String id, 
+            @Valid @RequestBody WorkflowEstadoUpdateDTO dto) {
+        return ResponseEntity.ok(workflowService.actualizarEstado(id, dto));
     }
 
     @GetMapping("/{id}/collaborators")

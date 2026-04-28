@@ -39,6 +39,12 @@ public class NotificacionController {
         return ResponseEntity.ok(notificacionService.obtenerPorUsuario(usuarioId));
     }
 
+    @GetMapping("/me")
+    @PreAuthorize("authenticated")
+    public ResponseEntity<List<NotificacionResponseDTO>> obtenerMisNotificaciones() {
+        return ResponseEntity.ok(notificacionService.obtenerMisNotificaciones());
+    }
+
     /** Cualquier usuario autenticado: marcar como leída */
     @PatchMapping("/{id}/leer")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLEADO', 'ROLE_CLIENTE', 'ROLE_DESIGNER')")

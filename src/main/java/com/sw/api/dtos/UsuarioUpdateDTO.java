@@ -1,7 +1,9 @@
 package com.sw.api.dtos;
 
+import java.util.List;
+
 public record UsuarioUpdateDTO(
         String nombre,
-        String departamento,
+        List<String> departamentos,
         String rolId) {
 }

@@ -18,6 +18,8 @@ public class Workflow {
     private String nombre;
 
     private String descripcion;
+    
+    private String estado = "BORRADOR"; // BORRADOR, PUBLICADO, INACTIVO, ARCHIVADO
 
     private List<Paso> pasos;
 

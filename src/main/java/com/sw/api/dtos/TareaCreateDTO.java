@@ -9,5 +9,7 @@ public record TareaCreateDTO(
     String workflowId,
 
     @NotNull(message = "Los datos de la tarea no pueden ser nulos")
-    Map<String, Object> datos
+    Map<String, Object> datos,
+    
+    java.util.List<String> documentosUrl
 ) {}

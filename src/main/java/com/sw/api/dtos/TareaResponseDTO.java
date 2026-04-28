@@ -12,5 +12,8 @@ public record TareaResponseDTO(
     String asignadoA,
     String prioridad,
     Map<String, Object> datos,
-    List<Tarea.Historial> historial
+    List<String> documentosUrl,
+    List<Tarea.Historial> historial,
+    List<Tarea.Comentario> comentarios,
+    com.sw.api.models.Formulario formulario
 ) {}

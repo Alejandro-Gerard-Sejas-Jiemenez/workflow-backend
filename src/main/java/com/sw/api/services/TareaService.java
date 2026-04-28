@@ -1,24 +1,18 @@
 package com.sw.api.services;
 
+import com.sw.api.dtos.*;
 import com.sw.api.models.Tarea;
 import com.sw.api.models.Usuario;
 import com.sw.api.models.Workflow;
-import com.sw.api.dtos.TareaCreateDTO;
-import com.sw.api.dtos.TareaAvanceDTO;
-import com.sw.api.dtos.TareaResponseDTO;
-import com.sw.api.dtos.WorkflowResponseDTO;
-import com.sw.api.repositories.NotificacionRepository;
-import com.sw.api.models.Notificacion;
 import com.sw.api.repositories.TareaRepository;
 import com.sw.api.repositories.UsuarioRepository;
+import com.sw.api.repositories.WorkflowRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 @Service
@@ -26,142 +20,240 @@ import java.util.List;
 public class TareaService {
 
     private final TareaRepository tareaRepository;
-    private final WorkflowService workflowService;
+    private final WorkflowRepository workflowRepository;
     private final UsuarioRepository usuarioRepository;
-    private final NotificacionRepository notificacionRepository;
+    private final com.sw.api.repositories.FormularioRepository formularioRepository;
+    private final NotificacionService notificacionService;
+    private final BitacoraService bitacoraService;
 
     public TareaResponseDTO iniciarTarea(TareaCreateDTO dto, String username) {
-        // Encontrar al actor que inicia por su email asociado en el Token
         Usuario usuario = usuarioRepository.findByEmail(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Extraer el catálogo para buscar la delegación del Paso 1
-        WorkflowResponseDTO workflow = workflowService.obtenerPorId(dto.workflowId());
-        
-        Workflow.Paso pasoInicial = workflow.pasos().stream()
-                .filter(p -> p.getOrden() == 1)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("El Workflow no tiene un Paso 1 configurado."));
+        Workflow workflow = workflowRepository.findById(dto.workflowId())
+                .orElseThrow(() -> new RuntimeException("Workflow no encontrado"));
 
-        // Construir instancia nativa
+        System.out.println("🚀 [CREATE] Iniciando tarea para Workflow: " + workflow.getNombre());
+
         Tarea tarea = new Tarea();
-        tarea.setWorkflowId(workflow.id());
-        tarea.setEstado("EN_PROGRESO");
-        tarea.setPasoActual(1);
-        tarea.setAsignadoA(pasoInicial.getDepartamento()); // Asignación dinámica inferida del Catálogo
-        tarea.setDatos(dto.datos());
-
-        // Inyectar Historial auto-generado
-        Tarea.Historial primerHistorial = new Tarea.Historial(
-                usuario.getId(),
-                "INICIO_TAREA",
-                "Tarea iniciada desde el formulario del cliente",
-                LocalDateTime.now()
-        );
+        tarea.setWorkflowId(workflow.getId());
+        tarea.setSolicitanteId(usuario.getId());
+        tarea.setEstado("PENDIENTE_VERIFICACION");
+        tarea.setPasoActual(0);
+        tarea.setAsignadoA("RECEPCION");
+        tarea.setDatos(dto.datos() != null ? new HashMap<>(dto.datos()) : new HashMap<>());
+        tarea.setDocumentosUrl(dto.documentosUrl());
         
-        List<Tarea.Historial> historialList = new ArrayList<>();
-        historialList.add(primerHistorial);
-        tarea.setHistorial(historialList);
+        // Inicializar listas
+        tarea.setHistorial(new ArrayList<>());
+        tarea.setComentarios(new ArrayList<>());
 
+        // Agregar primer hito al historial interno
+        registrarHistorial(tarea, usuario.getId(), "INICIO_TRAMITE", "El ciudadano inició el trámite de " + workflow.getNombre());
+
+        Tarea guardada = tareaRepository.save(tarea);
+        
+        System.out.println("   ✅ Tarea creada con ID: " + guardada.getId() + " asignada a: " + guardada.getAsignadoA());
+        
+        // Auditoría Global
+        bitacoraService.registrarAccion("INICIO_TRAMITE", "Tarea", "Trámite " + guardada.getId() + " iniciado por " + username);
+        
+        // Notificaciones
+        generarNotificacion("RECEPCION", "Nuevo trámite de " + workflow.getNombre() + " recibido.");
+
+        return mapToDTO(guardada);
+    }
+
+    public List<TareaResponseDTO> listarTareasParaEmpleado(String username) {
+        Usuario usuario = usuarioRepository.findByEmail(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        
+        List<String> depts = usuario.getDepartamentos();
+        List<Tarea> tareas = new ArrayList<>();
+        
+        // Cargar todas las tareas una sola vez para filtrar en memoria (más seguro con carriles)
+        List<Tarea> todas = tareaRepository.findAll();
+        System.out.println("🕵️ [LIST] Usuario: " + username + " | Deptos: " + depts + " | Total Tareas: " + todas.size());
+        
+        for (Tarea t : todas) {
+            String asignado = t.getAsignadoA();
+            if (asignado == null) {
+                System.out.println("   ⚠️ Tarea " + t.getId() + " no tiene departamento asignado.");
+                continue;
+            }
+
+            // 1. Ver si está asignado directamente al email
+            if (asignado.equalsIgnoreCase(username)) {
+                tareas.add(t);
+                continue;
+            }
+
+            // 2. Ver si es de RECEPCION (Global para empleados)
+            if (asignado.equalsIgnoreCase("RECEPCION") && hasRole(usuario, "ROLE_EMPLEADO")) {
+                tareas.add(t);
+                continue;
+            }
+
+            // 3. Ver si es de alguno de sus departamentos (Insensible a mayúsculas)
+            if (depts != null) {
+                boolean pertenece = depts.stream()
+                        .anyMatch(d -> d != null && d.trim().equalsIgnoreCase(asignado.trim()));
+                if (pertenece) {
+                    System.out.println("   ✅ Tarea aceptada por Depto Match: " + asignado);
+                    tareas.add(t);
+                    continue;
+                }
+            }
+            System.out.println("   ❌ Tarea " + t.getId() + " rechazada. Asignada a: [" + asignado + "]");
+
+            // 4. Ver si el usuario es el solicitante
+            if (usuario.getId().equals(t.getSolicitanteId())) {
+                tareas.add(t);
+            }
+        }
+        
+        return tareas.stream()
+            .distinct()
+            .filter(t -> !"COMPLETADO".equals(t.getEstado()) && !"RECHAZADO".equals(t.getEstado()))
+            .map(this::mapToDTO)
+            .toList();
+    }
+
+    private boolean hasRole(Usuario user, String role) {
+        if (user.getRol() == null || user.getRol().getNombre() == null) return false;
+        String userRole = user.getRol().getNombre();
+        String targetRole = role;
+        
+        // Normalizar ambos para comparar
+        if (!userRole.startsWith("ROLE_")) userRole = "ROLE_" + userRole;
+        if (!targetRole.startsWith("ROLE_")) targetRole = "ROLE_" + targetRole;
+        
+        return userRole.equalsIgnoreCase(targetRole);
+    }
+
+    public TareaResponseDTO validarSolicitud(String id, ValidarSolicitudRequest dto, String username) {
+        Tarea tarea = tareaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
+        
+        Usuario usuario = usuarioRepository.findByEmail(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (dto.aprobado()) {
+            Workflow workflow = workflowRepository.findById(tarea.getWorkflowId())
+                    .orElseThrow(() -> new RuntimeException("Error: No se encontró el Workflow relacionado (ID: " + tarea.getWorkflowId() + ")"));
+            
+            if (workflow.getPasos() != null && !workflow.getPasos().isEmpty()) {
+                // Saltamos al paso 1 (la primera tarea real) si existe, sino nos quedamos en el 0
+                int indexSiguiente = (workflow.getPasos().size() > 1) ? 1 : 0;
+                var proximoPaso = workflow.getPasos().get(indexSiguiente);
+                if (proximoPaso != null) {
+                    tarea.setAsignadoA(proximoPaso.getDepartamento());
+                    tarea.setEstado("EN_PROGRESO - " + proximoPaso.getNombre());
+                    tarea.setPasoActual(indexSiguiente);
+                    generarNotificacion(tarea.getAsignadoA(), "Nueva tarea asignada por validación inicial");
+                }
+            } else {
+                tarea.setEstado("EN_PROGRESO");
+            }
+            registrarHistorial(tarea, usuario.getId(), "VALIDACION_APROBADA", "Solicitud validada: " + dto.observaciones());
+            generarNotificacion(tarea.getSolicitanteId(), "Tu solicitud ha sido aprobada e iniciada.");
+        } else {
+            tarea.setEstado("RECHAZADO_CORRECCION");
+            tarea.setAsignadoA(tarea.getSolicitanteId());
+            registrarHistorial(tarea, usuario.getId(), "VALIDACION_RECHAZADA", "Requiere corrección: " + dto.observaciones());
+            generarNotificacion(tarea.getSolicitanteId(), "Tu solicitud requiere correcciones: " + dto.observaciones());
+        }
+
+        bitacoraService.registrarAccion("VALIDAR_SOLICITUD", "Tarea", "Validación de tarea " + id + " por " + username);
         return mapToDTO(tareaRepository.save(tarea));
     }
 
     public TareaResponseDTO gestionarTarea(String id, TareaAvanceDTO dto, String username) {
         Tarea tarea = tareaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
+
         Usuario usuario = usuarioRepository.findByEmail(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-                
-        // 1. Fusión de Datos
+
+        Workflow workflow = workflowRepository.findById(tarea.getWorkflowId())
+                .orElseThrow(() -> new RuntimeException("Workflow no encontrado"));
+
+        if (tarea.getPasoActual() < workflow.getPasos().size() - 1) {
+            tarea.setPasoActual(tarea.getPasoActual() + 1);
+            var proximoPaso = workflow.getPasos().get(tarea.getPasoActual());
+            tarea.setAsignadoA(proximoPaso.getDepartamento());
+            tarea.setEstado("EN_PROGRESO - " + proximoPaso.getNombre());
+            
+            generarNotificacion(tarea.getAsignadoA(), "Tienes una nueva tarea asignada: " + workflow.getNombre());
+            generarNotificacion(tarea.getSolicitanteId(), "Tu trámite ha avanzado a: " + proximoPaso.getNombre());
+        } else {
+            tarea.setEstado("COMPLETADO");
+            tarea.setAsignadoA(null);
+            generarNotificacion(tarea.getSolicitanteId(), "¡Felicidades! Tu trámite de " + workflow.getNombre() + " ha finalizado.");
+        }
+
         if (dto.nuevosDatos() != null) {
-            if (tarea.getDatos() == null) {
-                tarea.setDatos(new java.util.HashMap<>());
-            }
+            if (tarea.getDatos() == null) tarea.setDatos(new HashMap<>());
             tarea.getDatos().putAll(dto.nuevosDatos());
         }
 
-        WorkflowResponseDTO workflow = workflowService.obtenerPorId(tarea.getWorkflowId());
-
-        // 2. Evaluador SpEL
-        ExpressionParser parser = new SpelExpressionParser();
-        StandardEvaluationContext context = new StandardEvaluationContext();
-        context.setVariable("datos", tarea.getDatos());
-
-        boolean reglaAplicada = false;
+        registrarHistorial(tarea, usuario.getId(), dto.accionUsuario(), dto.detalle());
+        Tarea guardada = tareaRepository.save(tarea);
         
-        if (workflow.reglas() != null) {
-            for (Workflow.Regla regla : workflow.reglas()) {
-                Boolean condicionCumplida = parser.parseExpression(regla.getCondicion()).getValue(context, Boolean.class);
-                if (condicionCumplida != null && condicionCumplida) {
-                    aplicarAccion(tarea, regla.getAccion());
-                    reglaAplicada = true;
-                    break;
-                }
-            }
-        }
+        bitacoraService.registrarAccion("GESTIONAR_TAREA", "Tarea", "Tarea " + id + " gestionada por " + username);
 
-        // Si ninguna regla aplica, asumimos un avance natural
-        if (!reglaAplicada) {
-            avanzarPasoNatural(tarea, workflow);
-        }
-
-        // 3. Auditoría Local
-        Tarea.Historial nuevoHistorial = new Tarea.Historial(
-                usuario.getId(),
-                dto.accionUsuario(),
-                dto.detalle() != null ? dto.detalle() : "Acción ejecutada sobre la tarea",
-                LocalDateTime.now()
-        );
-        tarea.getHistorial().add(nuevoHistorial);
-
-        // 4. Notificación Asíncrona
-        if (!tarea.getEstado().equals("COMPLETADO") && !tarea.getEstado().equals("RECHAZADO")) {
-            generarNotificacion(tarea.getAsignadoA(), "Tienes una nueva tarea asignada en el paso " + tarea.getPasoActual());
-        }
-
-        return mapToDTO(tareaRepository.save(tarea));
+        return mapToDTO(guardada);
     }
 
-    private void aplicarAccion(Tarea tarea, String accion) {
-        if (accion.startsWith("SET_STATE(")) {
-            String nuevoEstado = accion.substring(10, accion.length() - 1).replace("'", "");
-            tarea.setEstado(nuevoEstado);
-        } else if (accion.startsWith("SKIP_TO(")) {
-            Integer nuevoPaso = Integer.parseInt(accion.substring(8, accion.length() - 1).replace("'", ""));
-            tarea.setPasoActual(nuevoPaso);
-        } else if (accion.startsWith("ASSIGN_TO(")) {
-            String nuevoAsignado = accion.substring(10, accion.length() - 1).replace("'", "");
-            tarea.setAsignadoA(nuevoAsignado);
-        }
+    public TareaResponseDTO obtenerPorId(String id) {
+        return tareaRepository.findById(id)
+                .map(this::mapToDTO)
+                .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
     }
 
-    private void avanzarPasoNatural(Tarea tarea, WorkflowResponseDTO workflow) {
-        int siguientePasoIdx = tarea.getPasoActual() + 1;
-        
-        Workflow.Paso siguientePaso = workflow.pasos().stream()
-                .filter(p -> p.getOrden() == siguientePasoIdx)
-                .findFirst()
-                .orElse(null);
-
-        if (siguientePaso != null) {
-            tarea.setPasoActual(siguientePasoIdx);
-            tarea.setAsignadoA(siguientePaso.getDepartamento());
-        } else {
-            tarea.setEstado("COMPLETADO");
-        }
+    private void registrarHistorial(Tarea tarea, String usuarioId, String accion, String detalle) {
+        if (tarea.getHistorial() == null) tarea.setHistorial(new ArrayList<>());
+        tarea.getHistorial().add(new Tarea.Historial(usuarioId, accion, detalle, LocalDateTime.now()));
     }
 
-    private void generarNotificacion(String asignadoA, String mensaje) {
-        Notificacion notificacion = new Notificacion();
-        notificacion.setUsuarioId(asignadoA);
-        notificacion.setMensaje(mensaje);
-        notificacion.setTipo("TAREA_ASIGNADA");
-        notificacion.setLeido(false);
-        notificacion.setFecha(LocalDateTime.now());
-        notificacionRepository.save(notificacion);
+    private void generarNotificacion(String usuarioId, String mensaje) {
+        notificacionService.generarNotificacionSystem(usuarioId, mensaje, "TAREA_ASIGNADA");
     }
 
     private TareaResponseDTO mapToDTO(Tarea t) {
+        com.sw.api.models.Formulario formulario = null;
+        try {
+            System.out.println("🔍 [MAP] Cargando DTO para Tarea: " + t.getId() + " (Paso Actual: " + t.getPasoActual() + ")");
+            Workflow workflow = workflowRepository.findById(t.getWorkflowId()).orElse(null);
+            
+            if (workflow != null) {
+                System.out.println("   📦 Workflow: " + workflow.getNombre() + " (Total Pasos: " + (workflow.getPasos() != null ? workflow.getPasos().size() : 0) + ")");
+                
+                if (workflow.getPasos() != null && t.getPasoActual() < workflow.getPasos().size()) {
+                    var paso = workflow.getPasos().get(t.getPasoActual());
+                    System.out.println("   📍 Paso detectado: " + paso.getNombre() + " (FormID: " + paso.getFormularioId() + ")");
+                    
+                    if (paso.getFormularioId() != null) {
+                        formulario = formularioRepository.findById(paso.getFormularioId()).orElse(null);
+                        if (formulario != null) {
+                            System.out.println("   ✅ Formulario CARGADO: " + formulario.getNombre() + " con " + (formulario.getCampos() != null ? formulario.getCampos().size() : 0) + " campos.");
+                        } else {
+                            System.out.println("   ❌ Formulario NO ENCONTRADO en DB con ID: " + paso.getFormularioId());
+                        }
+                    } else {
+                        System.out.println("   ⚠️ El paso no tiene asignado un FormularioId.");
+                    }
+                } else {
+                    System.out.println("   ❌ Indice de paso fuera de rango o pasos nulos.");
+                }
+            } else {
+                System.out.println("   ❌ Workflow no encontrado para la tarea.");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error al cargar formulario para DTO: " + e.getMessage());
+            e.printStackTrace();
+        }
+
         return new TareaResponseDTO(
                 t.getId(),
                 t.getWorkflowId(),
@@ -170,7 +262,10 @@ public class TareaService {
                 t.getAsignadoA(),
                 t.getPrioridad(),
                 t.getDatos(),
-                t.getHistorial()
+                t.getDocumentosUrl(),
+                t.getHistorial(),
+                t.getComentarios(),
+                formulario
         );
     }
 }

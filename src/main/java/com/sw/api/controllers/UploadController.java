@@ -22,7 +22,7 @@ public class UploadController {
     }
 
     @PostMapping("/imagenes")
-    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<String>> uploadImages(@RequestParam("files") List<MultipartFile> files) {
         try {
             List<String> imageUrls = new ArrayList<>();

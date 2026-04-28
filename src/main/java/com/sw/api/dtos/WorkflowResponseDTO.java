@@ -8,6 +8,7 @@ public record WorkflowResponseDTO(
     String id,
     String nombre,
     String descripcion,
+    String estado,
     List<Workflow.Paso> pasos,
     @Valid
     List<Workflow.Regla> reglas,

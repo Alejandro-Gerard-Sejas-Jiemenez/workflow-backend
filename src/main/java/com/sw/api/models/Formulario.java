@@ -30,6 +30,6 @@ public class Formulario {
         private String nombre;
         private String tipo;
         private boolean requerido;
-        private Map<String, Object> opciones;
+        private Object opciones;
     }
 }

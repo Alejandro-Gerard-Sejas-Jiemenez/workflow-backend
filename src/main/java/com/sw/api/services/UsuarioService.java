@@ -23,6 +23,7 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final RolRepository rolRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BitacoraService bitacoraService;
 
     public UsuarioResponseDTO crear(UsuarioCreateDTO dto) {
         if (usuarioRepository.findByEmail(dto.email()).isPresent()) {
@@ -36,11 +37,13 @@ public class UsuarioService {
         usuario.setNombre(dto.nombre());
         usuario.setEmail(dto.email());
         usuario.setPassword(passwordEncoder.encode(dto.password()));
-        usuario.setDepartamento(dto.departamento());
+        usuario.setDepartamentos(dto.departamentos());
         usuario.setRol(rol);
         usuario.setActivo(true);
 
-        return mapToDTO(usuarioRepository.save(usuario));
+        Usuario saved = usuarioRepository.save(usuario);
+        bitacoraService.registrarAccion("CREAR_USUARIO", "Usuario", "Se creó el usuario " + saved.getEmail() + " con rol " + rol.getNombre());
+        return mapToDTO(saved);
     }
 
     public List<UsuarioResponseDTO> obtenerTodos() {
@@ -74,8 +77,8 @@ public class UsuarioService {
 
         if (dto.nombre() != null)
             usuario.setNombre(dto.nombre());
-        if (dto.departamento() != null)
-            usuario.setDepartamento(dto.departamento());
+        if (dto.departamentos() != null)
+            usuario.setDepartamentos(dto.departamentos());
 
         if (dto.rolId() != null) {
             Rol rol = rolRepository.findById(dto.rolId())
@@ -83,7 +86,9 @@ public class UsuarioService {
             usuario.setRol(rol);
         }
 
-        return mapToDTO(usuarioRepository.save(usuario));
+        Usuario saved = usuarioRepository.save(usuario);
+        bitacoraService.registrarAccion("ACTUALIZAR_USUARIO", "Usuario", "Se actualizó el usuario " + saved.getEmail());
+        return mapToDTO(saved);
     }
 
     public void eliminar(String id) {
@@ -92,6 +97,7 @@ public class UsuarioService {
 
         usuario.setActivo(false);
         usuarioRepository.save(usuario);
+        bitacoraService.registrarAccion("DESACTIVAR_USUARIO", "Usuario", "Se desactivó el usuario " + usuario.getEmail());
     }
 
     public void restaurar(String id) {
@@ -100,6 +106,14 @@ public class UsuarioService {
 
         usuario.setActivo(true);
         usuarioRepository.save(usuario);
+        bitacoraService.registrarAccion("RESTAURAR_USUARIO", "Usuario", "Se restauró el usuario " + usuario.getEmail());
+    }
+
+    public void actualizarFcmToken(String email, String token) {
+        usuarioRepository.findByEmail(email).ifPresent(u -> {
+            u.setFcmToken(token);
+            usuarioRepository.save(u);
+        });
     }
 
     private UsuarioResponseDTO mapToDTO(Usuario usuario) {
@@ -107,7 +121,7 @@ public class UsuarioService {
                 usuario.getId(),
                 usuario.getEmail(),
                 usuario.getNombre(),
-                usuario.getDepartamento(),
+                usuario.getDepartamentos(),
                 (usuario.getRol() != null) ? usuario.getRol().getNombre() : "SIN_ROL",
                 usuario.isEstadoConexion(),
                 usuario.getUltimaConexion());

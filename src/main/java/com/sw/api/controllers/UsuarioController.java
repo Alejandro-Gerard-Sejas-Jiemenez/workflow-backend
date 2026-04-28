@@ -64,6 +64,12 @@ public class UsuarioController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/fcm-token")
+    public ResponseEntity<Void> actualizarFcmToken(@RequestBody String token, java.security.Principal principal) {
+        usuarioService.actualizarFcmToken(principal.getName(), token);
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> eliminarUsuario(@PathVariable String id) {

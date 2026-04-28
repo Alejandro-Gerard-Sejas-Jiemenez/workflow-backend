@@ -48,7 +48,7 @@ public class AuthService {
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setEmail(request.email());
         nuevoUsuario.setNombre(request.nombre());
-        nuevoUsuario.setDepartamento(request.departamento());
+        nuevoUsuario.setDepartamentos(request.departamentos());
         nuevoUsuario.setPassword(passwordEncoder.encode(request.password()));
         nuevoUsuario.setEstadoConexion(true);
         nuevoUsuario.setUltimaConexion(LocalDateTime.now());
@@ -59,6 +59,8 @@ public class AuthService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", usuarioGuardado.getId());
         extraClaims.put("nombre", usuarioGuardado.getNombre());
+        extraClaims.put("departamento", usuarioGuardado.getDepartamentos().isEmpty() ? "" : usuarioGuardado.getDepartamentos().get(0));
+        extraClaims.put("departamentos", usuarioGuardado.getDepartamentos());
         extraClaims.put("rol", usuarioGuardado.getRol().getNombre());
 
         var jwtToken = jwtService.generarToken(extraClaims, usuarioGuardado);
@@ -81,7 +83,12 @@ public class AuthService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
         extraClaims.put("nombre", user.getNombre());
+        extraClaims.put("departamento", user.getDepartamentos().isEmpty() ? "" : user.getDepartamentos().get(0));
+        extraClaims.put("departamentos", user.getDepartamentos());
         String nombreRol = (user.getRol() != null) ? user.getRol().getNombre() : "SIN_ROL";
+        if (!nombreRol.equals("SIN_ROL") && !nombreRol.startsWith("ROLE_")) {
+            nombreRol = "ROLE_" + nombreRol;
+        }
         extraClaims.put("rol", nombreRol);
 
         var jwtToken = jwtService.generarToken(extraClaims, user);
@@ -122,7 +129,12 @@ public class AuthService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
         extraClaims.put("nombre", user.getNombre());
+        extraClaims.put("departamento", user.getDepartamentos().isEmpty() ? "" : user.getDepartamentos().get(0));
+        extraClaims.put("departamentos", user.getDepartamentos());
         String nombreRol = (user.getRol() != null) ? user.getRol().getNombre() : "SIN_ROL";
+        if (!nombreRol.equals("SIN_ROL") && !nombreRol.startsWith("ROLE_")) {
+            nombreRol = "ROLE_" + nombreRol;
+        }
         extraClaims.put("rol", nombreRol);
 
         var nuevoToken = jwtService.generarToken(extraClaims, user);

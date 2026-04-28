@@ -25,8 +25,9 @@ public class Usuario extends Auditable implements UserDetails {
     private String email;
 
     private String password;
+    private String fcmToken;
 
-    private String departamento;
+    private List<String> departamentos = new java.util.ArrayList<>();
 
     private boolean activo = true;
 
@@ -42,6 +43,9 @@ public class Usuario extends Auditable implements UserDetails {
         String roleName = "ROLE_USER";
         if (rol != null && rol.getNombre() != null) {
             roleName = rol.getNombre();
+            if (!roleName.startsWith("ROLE_")) {
+                roleName = "ROLE_" + roleName;
+            }
         }
         return List.of(new SimpleGrantedAuthority(roleName));
     }

@@ -8,6 +8,8 @@ import com.sw.api.repositories.FormularioRepository;
 import com.sw.api.repositories.RolRepository;
 import com.sw.api.repositories.UsuarioRepository;
 import com.sw.api.repositories.WorkflowRepository;
+import com.sw.api.repositories.DepartamentoRepository;
+import com.sw.api.models.Departamento;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,11 +26,13 @@ public class DataInitializer implements CommandLineRunner {
     private final UsuarioRepository usuarioRepository;
     private final FormularioRepository formularioRepository;
     private final WorkflowRepository workflowRepository;
+    private final DepartamentoRepository departamentoRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) throws Exception {
         initializeRoles();
+        initializeDepartamentos();
         initializeAdmin();
         initializeTestData();
     }
@@ -46,6 +50,19 @@ public class DataInitializer implements CommandLineRunner {
         });
     }
 
+    private void initializeDepartamentos() {
+        if (departamentoRepository.count() == 0) {
+            List<String> deps = List.of("TI", "Recursos Humanos", "Finanzas", "Operaciones", "Atención al Cliente",
+                    "Gerencia", "RECEPCION");
+            deps.forEach(nombre -> {
+                Departamento d = new Departamento();
+                d.setNombre(nombre);
+                departamentoRepository.save(d);
+            });
+            System.out.println("✅ Departamentos inicializados por defecto.");
+        }
+    }
+
     private void initializeAdmin() {
         String adminEmail = "admin@workflow.com";
         if (usuarioRepository.findByEmail(adminEmail).isEmpty()) {
@@ -56,12 +73,29 @@ public class DataInitializer implements CommandLineRunner {
             admin.setNombre("Admin");
             admin.setEmail(adminEmail);
             admin.setPassword(passwordEncoder.encode("admin123"));
-            admin.setDepartamento("TI");
+            admin.setDepartamentos(List.of("TI"));
             admin.setRol(adminRol);
             admin.setActivo(true);
 
             usuarioRepository.save(admin);
             System.out.println("✅ Usuario Administrador creado: " + adminEmail);
+        }
+
+        String employeeEmail = "empleado@workflow.com";
+        if (usuarioRepository.findByEmail(employeeEmail).isEmpty()) {
+            Rol empRol = rolRepository.findByNombre("ROLE_EMPLEADO")
+                    .orElseThrow(() -> new RuntimeException("Error: Rol ROLE_EMPLEADO no encontrado."));
+
+            Usuario employee = new Usuario();
+            employee.setNombre("Funcionario Prueba");
+            employee.setEmail(employeeEmail);
+            employee.setPassword(passwordEncoder.encode("empleado123"));
+            employee.setDepartamentos(List.of("RECEPCION"));
+            employee.setRol(empRol);
+            employee.setActivo(true);
+
+            usuarioRepository.save(employee);
+            System.out.println("✅ Usuario Funcionario creado: " + employeeEmail);
         }
     }
 
@@ -90,6 +124,7 @@ public class DataInitializer implements CommandLineRunner {
                 pasos.add(new Workflow.Paso("Aprobacion Final", 3, "ADMIN", formVacaciones.getId()));
 
                 workflowVacaciones.setPasos(pasos);
+                workflowVacaciones.setEstado("PUBLICADO");
                 workflowRepository.save(workflowVacaciones);
                 System.out.println("✅ Workflow de Vacaciones creado.");
             }

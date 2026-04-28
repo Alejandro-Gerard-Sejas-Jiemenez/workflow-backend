@@ -18,6 +18,7 @@ public class Tarea {
     private String id;
 
     private String workflowId;
+    private String solicitanteId;
 
     private String estado;
 
@@ -26,6 +27,8 @@ public class Tarea {
     private String asignadoA;
 
     private String prioridad; // ALTA | MEDIA | BAJA (asignado por IA)
+    
+    private List<String> documentosUrl;
 
     private Map<String, Object> datos;
 

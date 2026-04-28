@@ -64,7 +64,10 @@ public class IaAnalisisService {
                 guardada.getAsignadoA(),
                 guardada.getPrioridad(),
                 guardada.getDatos(),
-                guardada.getHistorial()
+                guardada.getDocumentosUrl(),
+                guardada.getHistorial(),
+                guardada.getComentarios(),
+                null // Formulario no requerido para el análisis de prioridad
         );
     }
 

@@ -33,8 +33,20 @@ public class TareaController {
         return ResponseEntity.ok(tareaService.iniciarTarea(dto, principal.getName()));
     }
 
+    @GetMapping("/mis-tareas")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLEADO', 'ROLE_CLIENTE')")
+    public ResponseEntity<List<TareaResponseDTO>> misTareas(Principal principal) {
+        return ResponseEntity.ok(tareaService.listarTareasParaEmpleado(principal.getName()));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLEADO', 'ROLE_CLIENTE', 'ROLE_ADMIN')")
+    public ResponseEntity<TareaResponseDTO> obtenerPorId(@PathVariable String id) {
+        return ResponseEntity.ok(tareaService.obtenerPorId(id));
+    }
+
     @PostMapping("/{id}/gestionar")
-    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLEADO', 'EMPLEADO', 'ROLE_ADMIN')")
     public ResponseEntity<TareaResponseDTO> gestionarTarea(
             @PathVariable String id,
             @Valid @RequestBody TareaAvanceDTO dto,
@@ -42,8 +54,17 @@ public class TareaController {
         return ResponseEntity.ok(tareaService.gestionarTarea(id, dto, principal.getName()));
     }
 
+    @PostMapping("/{id}/validar")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLEADO', 'EMPLEADO', 'ROLE_ADMIN')")
+    public ResponseEntity<TareaResponseDTO> validarSolicitud(
+            @PathVariable String id,
+            @Valid @RequestBody com.sw.api.dtos.ValidarSolicitudRequest dto,
+            Principal principal) {
+        return ResponseEntity.ok(tareaService.validarSolicitud(id, dto, principal.getName()));
+    }
+
     @PostMapping("/{id}/comentarios")
-    @PreAuthorize("hasAuthority('ROLE_EMPLEADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLEADO', 'EMPLEADO', 'ROLE_ADMIN', 'ROLE_CLIENTE')")
     public ResponseEntity<ComentarioResponseDTO> agregarComentario(
             @PathVariable String id,
             @Valid @RequestBody ComentarioCreateDTO dto,

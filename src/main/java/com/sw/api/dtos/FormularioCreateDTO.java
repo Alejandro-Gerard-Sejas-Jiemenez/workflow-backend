@@ -25,7 +25,7 @@ public record FormularioCreateDTO(
 
         Boolean requerido,
         
-        Map<String, Object> opciones
+        Object opciones
     ) {
         public boolean isRequerido() {
             return requerido != null ? requerido : false;
