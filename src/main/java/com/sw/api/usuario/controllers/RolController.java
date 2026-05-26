@@ -19,7 +19,7 @@ public class RolController {
     private final RolService rolService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+
     public ResponseEntity<List<RolResponseDTO>> obtenerRoles() {
         return ResponseEntity.ok(rolService.obtenerTodos());
     }
