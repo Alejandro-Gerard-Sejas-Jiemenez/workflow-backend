@@ -22,6 +22,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class JwtService {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JwtService.class);
+    private final java.util.Set<String> localBlacklist = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private final StringRedisTemplate redisTemplate;
 
     // Esta llave secreta la pondremos en el application.properties enseguida
@@ -85,11 +88,21 @@ public class JwtService {
         long remainingTime = expiration.getTime() - System.currentTimeMillis();
         
         if (remainingTime > 0) {
-            redisTemplate.opsForValue().set(token, "blacklisted", remainingTime, TimeUnit.MILLISECONDS);
+            try {
+                redisTemplate.opsForValue().set(token, "blacklisted", remainingTime, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                logger.warn("⚠️ Redis no está disponible. Guardando token en memoria local: {}", e.getMessage());
+                localBlacklist.add(token);
+            }
         }
     }
 
     public boolean isTokenBlacklisted(String token) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(token));
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(token));
+        } catch (Exception e) {
+            logger.warn("⚠️ Redis no está disponible para verificar el blacklist. Usando respaldo en memoria local: {}", e.getMessage());
+            return localBlacklist.contains(token);
+        }
     }
 }

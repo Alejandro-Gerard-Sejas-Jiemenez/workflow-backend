@@ -5,5 +5,9 @@
 
 package com.sw.api.auth.dtos;
 
-public record LoginRequest(String email, String password) {}
+public record LoginRequest(String email, String password) {
+	public String getEmail() {
+		return email;
+	}
+}
 

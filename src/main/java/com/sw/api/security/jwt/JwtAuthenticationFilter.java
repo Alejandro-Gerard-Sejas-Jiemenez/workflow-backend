@@ -58,25 +58,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 3. Extraer el email del token y validar
-        final String userEmail = jwtService.extractUsername(jwt);
+        String userEmail = null;
+        try {
+            // 3. Extraer el email del token y validar
+            userEmail = jwtService.extractUsername(jwt);
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // Si el token expiró, no autenticamos pero dejamos seguir la petición (el controlador/seguridad se encargará)
+        } catch (Exception e) {
+            // Si el token es inválido, corrupto o tiene firma incorrecta, lo ignoramos y dejamos seguir la petición
+        }
 
         // Si hay email y el usuario no está autenticado en el contexto actual...
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            try {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-            // Verificamos si el token es válido y no ha expirado
-            if (jwtService.isTokenValid(jwt, userDetails)) {
-                // Autenticamos al usuario oficialmente
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                
-                // Guardamos el inicio de sesión en el contexto de Spring
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                // Verificamos si el token es válido y no ha expirado
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    // Autenticamos al usuario oficialmente
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    
+                    // Guardamos el inicio de sesión en el contexto de Spring
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            } catch (Exception e) {
+                // Errores al cargar el usuario o validar se manejan de forma silenciosa
             }
         }
         
