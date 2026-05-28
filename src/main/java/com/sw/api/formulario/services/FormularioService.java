@@ -61,8 +61,12 @@ public class FormularioService {
         return new FormularioResponseDTO(
             f.getId(),
             f.getNombre(),
+            f.getDescripcion(),
             f.getCampos(),
-            f.getReglasVisibilidad()
+            f.getReglasVisibilidad(),
+            f.isAllowAttachments(),
+            f.getAllowedTypes(),
+            f.getRequiredDocs()
         );
     }
 }

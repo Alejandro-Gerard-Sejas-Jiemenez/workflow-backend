@@ -25,7 +25,8 @@ public class CloudinaryService {
 
         // Subida masiva al folder "workflow_files" para ordenarlo en Cloudinary
         Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
-                "folder", "workflow_files"
+                "folder", "workflow_files",
+                "resource_type", "raw"
         ));
 
         // Obtener la URL segura de retorno

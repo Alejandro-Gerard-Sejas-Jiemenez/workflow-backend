@@ -6,6 +6,10 @@ import com.sw.api.formulario.models.Formulario;
 public record FormularioResponseDTO(
     String id,
     String nombre,
+    String descripcion,
     List<Formulario.Campo> campos,
-    List<Object> reglasVisibilidad
+    List<Object> reglasVisibilidad,
+    boolean allowAttachments,
+    String allowedTypes,
+    String requiredDocs
 ) {}

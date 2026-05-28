@@ -320,16 +320,38 @@ public class WorkflowService {
                 }
             }
 
-            // 2. Procesar cada nodo del diagrama
-            int orden = 1;
+            // 2. Filtrar y ordenar los nodos: primero los nodos de tipo "start", luego los "task" (ordenados de izquierda a derecha por coordenada X)
+            List<JsonNode> nodosFiltrados = new ArrayList<>();
+            List<JsonNode> startNodes = new ArrayList<>();
+            List<JsonNode> taskNodes = new ArrayList<>();
+
             for (JsonNode node : nodes) {
                 String type = node.has("type") ? node.get("type").asText() : "unknown";
-                
-                if ("start".equals(type) || "task".equals(type)) {
-                    JsonNode data = node.get("data");
-                    if (data == null) continue;
+                if ("start".equals(type)) {
+                    startNodes.add(node);
+                } else if ("task".equals(type)) {
+                    taskNodes.add(node);
+                }
+            }
 
-                    String label = data.has("label") ? data.get("label").asText() : "Paso " + orden;
+            // Ordenar tareas de izquierda a derecha por posición X
+            taskNodes.sort((a, b) -> {
+                double ax = a.has("position") && a.get("position").has("x") ? a.get("position").get("x").asDouble() : 0.0;
+                double bx = b.has("position") && b.get("position").has("x") ? b.get("position").get("x").asDouble() : 0.0;
+                return Double.compare(ax, bx);
+            });
+
+            nodosFiltrados.addAll(startNodes);
+            nodosFiltrados.addAll(taskNodes);
+
+            int orden = 1;
+            for (JsonNode node : nodosFiltrados) {
+                String type = node.has("type") ? node.get("type").asText() : "unknown";
+                
+                JsonNode data = node.get("data");
+                if (data == null) continue;
+
+                String label = data.has("label") ? data.get("label").asText() : "Paso " + orden;
                     
                     // Detectar si tiene formulario (check manual o existencia de campos)
                     boolean tieneSchema = data.has("formSchema");
@@ -407,8 +429,7 @@ public class WorkflowService {
 
                         // Crear o actualizar formulario (Incluso si esta vacio, para evitar el mensaje de error)
                         Formulario formulario = new Formulario();
-                        formulario.setNombre("Form: " + label + " (" + workflow.getNombre() + ")");
-                        
+                        String title = label;
                         boolean allowAttachments = false;
                         String allowedTypes = "";
                         String requiredDocs = "";
@@ -416,6 +437,9 @@ public class WorkflowService {
                         
                         if (data.has("formSchema")) {
                             JsonNode schemaNode = data.get("formSchema");
+                            if (schemaNode.has("title") && !schemaNode.get("title").asText().isBlank()) {
+                                title = schemaNode.get("title").asText();
+                            }
                             if (schemaNode.has("allowAttachments")) {
                                 allowAttachments = schemaNode.get("allowAttachments").asBoolean();
                             }
@@ -430,6 +454,7 @@ public class WorkflowService {
                             }
                         }
                         
+                        formulario.setNombre(title);
                         formulario.setAllowAttachments(allowAttachments);
                         formulario.setAllowedTypes(allowedTypes);
                         formulario.setRequiredDocs(requiredDocs);
@@ -451,8 +476,8 @@ public class WorkflowService {
                                 }
                                 campos.add(new Formulario.Campo(fNombre, fTipo, fReq, fOpciones));
                             }
-                        } else {
-                            // Campo por defecto para que no este totalmente vacio si la IA fallo
+                        } else if (!allowAttachments) {
+                            // Campo por defecto para que no este totalmente vacio si la IA fallo y no hay adjuntos
                             campos.add(new Formulario.Campo("Observaciones", "textarea", false, new ArrayList<>()));
                         }
                         
@@ -464,7 +489,6 @@ public class WorkflowService {
                         nuevosPasos.add(new Workflow.Paso(label, orden++, dept, formularioId));
                     }
                 }
-            }
 
             workflow.setPasos(nuevosPasos);
             System.out.println("🚀 [DEBUG] Sincronizacion terminada. Pasos: " + nuevosPasos.size());
