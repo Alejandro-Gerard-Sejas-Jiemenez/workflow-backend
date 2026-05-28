@@ -18,9 +18,17 @@ public class Formulario {
 
     private String nombre;
 
+    private String descripcion;
+
     private List<Campo> campos;
 
     private List<Object> reglasVisibilidad;
+
+    private boolean allowAttachments;
+
+    private String allowedTypes;
+
+    private String requiredDocs;
 
     @Getter
     @Setter

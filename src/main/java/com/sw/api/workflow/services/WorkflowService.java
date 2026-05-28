@@ -289,6 +289,7 @@ public class WorkflowService {
             System.out.println("🔍 [DEBUG] Iniciando sincronizacion: " + workflow.getNombre());
             JsonNode root = objectMapper.readTree(diagramData);
             JsonNode nodes = root.get("nodes");
+            System.out.println("   [DEBUG] Total nodos en el JSON del diagrama: " + (nodes != null ? nodes.size() : 0));
             
             if (nodes == null || !nodes.isArray()) {
                 System.out.println("⚠️ [DEBUG] El diagrama no tiene un array de nodos valido.");
@@ -302,6 +303,20 @@ public class WorkflowService {
             for (JsonNode node : nodes) {
                 if (node.has("id") && node.has("data") && node.get("data").has("label")) {
                     nodeNames.put(node.get("id").asText(), node.get("data").get("label").asText());
+                }
+            }
+
+            List<JsonNode> lanes = new ArrayList<>();
+            for (JsonNode n : nodes) {
+                String type = n.has("type") ? n.get("type").asText() : "";
+                if ("lane".equals(type)) {
+                    lanes.add(n);
+                    String label = n.has("data") && n.get("data").has("label") ? n.get("data").get("label").asText() : "Sin etiqueta";
+                    double lx = n.has("position") && n.get("position").has("x") ? n.get("position").get("x").asDouble() : 0.0;
+                    double ly = n.has("position") && n.get("position").has("y") ? n.get("position").get("y").asDouble() : 0.0;
+                    double lw = n.has("size") && n.get("size").has("width") ? n.get("size").get("width").asDouble() : 200.0;
+                    double lh = n.has("size") && n.get("size").has("height") ? n.get("size").get("height").asDouble() : 800.0;
+                    System.out.println("   [DEBUG] Carril detectado: [" + label + "] -> Pos(" + lx + ", " + ly + "), Size(" + lw + ", " + lh + ")");
                 }
             }
 
@@ -319,25 +334,107 @@ public class WorkflowService {
                     // Detectar si tiene formulario (check manual o existencia de campos)
                     boolean tieneSchema = data.has("formSchema");
                     boolean tieneFields = tieneSchema && data.get("formSchema").has("fields") && data.get("formSchema").get("fields").size() > 0;
-                    boolean formActivo = (data.has("formEnabled") && data.get("formEnabled").asBoolean()) || tieneFields;
+                    boolean formActivo = true;
+                    if (data.has("formEnabled")) {
+                        formActivo = data.get("formEnabled").asBoolean();
+                    }
 
                     if (formActivo) {
                         System.out.println("📍 [DEBUG] Nodo procesado: " + label + " (Campos: " + (tieneFields ? data.get("formSchema").get("fields").size() : 0) + ")");
                         
-                        // Determinar departamento (IA usa 'role')
-                        String dept = "RECEPCION";
-                        if (data.has("role")) dept = data.get("role").asText();
-                        else if (data.has("departamento")) dept = data.get("departamento").asText();
-                        else if (data.has("lane")) dept = data.get("lane").asText();
-                        else if (node.has("parentId")) {
-                            String parentName = nodeNames.get(node.get("parentId").asText());
-                            if (parentName != null) dept = parentName;
+                        // Determinar departamento
+                        String dept = null;
+                        
+                        if ("start".equals(type)) {
+                            dept = "RECEPCION";
+                            System.out.println("   [DEBUG] Nodo de inicio. Asignando automaticamente a RECEPCION.");
+                        } else {
+                            // 1. Detectar si está dentro de algún carril (lane) por coordenadas
+                            if (node.has("position")) {
+                                double taskX = node.get("position").has("x") ? node.get("position").get("x").asDouble() : 0.0;
+                                double taskY = node.get("position").has("y") ? node.get("position").get("y").asDouble() : 0.0;
+                                System.out.println("   [DEBUG] Evaluando posicion de Tarea [" + label + "]: Pos(" + taskX + ", " + taskY + ")");
+                                
+                                for (JsonNode lane : lanes) {
+                                    if (lane.has("position")) {
+                                        double laneX = lane.get("position").has("x") ? lane.get("position").get("x").asDouble() : 0.0;
+                                        double laneY = lane.get("position").has("y") ? lane.get("position").get("y").asDouble() : 0.0;
+                                        double laneW = lane.has("size") && lane.get("size").has("width") ? lane.get("size").get("width").asDouble() : 200.0;
+                                        double laneH = lane.has("size") && lane.get("size").has("height") ? lane.get("size").get("height").asDouble() : 800.0;
+                                        
+                                        boolean inX = taskX >= laneX && taskX <= (laneX + laneW);
+                                        boolean inY = taskY >= laneY && taskY <= (laneY + laneH);
+                                        
+                                        if (inX && inY) {
+                                            if (lane.has("data") && lane.get("data").has("label")) {
+                                                dept = lane.get("data").get("label").asText();
+                                                System.out.println("      [DEBUG] ¡Colision! Tarea [" + label + "] cae dentro de carril [" + dept + "]");
+                                                if (dept != null && !dept.isBlank()) {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        
+                        // 2. Si no se encontró carril por coordenadas, intentar parentId
+                        if ((dept == null || dept.isBlank()) && node.has("parentId")) {
+                            String parentName = nodeNames.get(node.get("parentId").asText());
+                            if (parentName != null && !parentName.isBlank()) {
+                                dept = parentName;
+                            }
+                        }
+                        
+                        // 3. Fallbacks a atributos directos
+                        if (dept == null || dept.isBlank()) {
+                            if (data.has("role") && !data.get("role").asText().isBlank()) {
+                                dept = data.get("role").asText();
+                            } else if (data.has("departamento") && !data.get("departamento").asText().isBlank()) {
+                                dept = data.get("departamento").asText();
+                            } else if (data.has("lane") && !data.get("lane").asText().isBlank()) {
+                                dept = data.get("lane").asText();
+                            }
+                        }
+                        
+                        // 4. Default global
+                        if (dept == null || dept.isBlank()) {
+                            dept = "RECEPCION";
+                        }
+                        
                         dept = dept.replace("ROLE_", "");
 
                         // Crear o actualizar formulario (Incluso si esta vacio, para evitar el mensaje de error)
                         Formulario formulario = new Formulario();
                         formulario.setNombre("Form: " + label + " (" + workflow.getNombre() + ")");
+                        
+                        boolean allowAttachments = false;
+                        String allowedTypes = "";
+                        String requiredDocs = "";
+                        String description = "";
+                        
+                        if (data.has("formSchema")) {
+                            JsonNode schemaNode = data.get("formSchema");
+                            if (schemaNode.has("allowAttachments")) {
+                                allowAttachments = schemaNode.get("allowAttachments").asBoolean();
+                            }
+                            if (schemaNode.has("allowedTypes")) {
+                                allowedTypes = schemaNode.get("allowedTypes").asText();
+                            }
+                            if (schemaNode.has("requiredDocs")) {
+                                requiredDocs = schemaNode.get("requiredDocs").asText();
+                            }
+                            if (schemaNode.has("description")) {
+                                description = schemaNode.get("description").asText();
+                            }
+                        }
+                        
+                        formulario.setAllowAttachments(allowAttachments);
+                        formulario.setAllowedTypes(allowedTypes);
+                        formulario.setRequiredDocs(requiredDocs);
+                        formulario.setDescripcion(description);
+
                         List<Formulario.Campo> campos = new ArrayList<>();
                         
                         if (tieneFields) {
@@ -345,17 +442,24 @@ public class WorkflowService {
                                 String fNombre = field.has("label") ? field.get("label").asText() : (field.has("id") ? field.get("id").asText() : "campo");
                                 String fTipo = field.has("type") ? field.get("type").asText() : "text";
                                 boolean fReq = field.has("required") && field.get("required").asBoolean();
-                                campos.add(new Formulario.Campo(fNombre, fTipo, fReq, null));
+                                
+                                List<String> fOpciones = new ArrayList<>();
+                                if (field.has("options") && field.get("options").isArray()) {
+                                    for (JsonNode opt : field.get("options")) {
+                                        fOpciones.add(opt.asText());
+                                    }
+                                }
+                                campos.add(new Formulario.Campo(fNombre, fTipo, fReq, fOpciones));
                             }
                         } else {
                             // Campo por defecto para que no este totalmente vacio si la IA fallo
-                            campos.add(new Formulario.Campo("Observaciones", "textarea", false, null));
+                            campos.add(new Formulario.Campo("Observaciones", "textarea", false, new ArrayList<>()));
                         }
                         
                         formulario.setCampos(campos);
                         formulario = formularioRepository.save(formulario);
                         String formularioId = formulario.getId();
-                        System.out.println("   ✅ Formulario listo: " + formularioId + " asignado a " + dept);
+                        System.out.println("   ✅ Formulario listo: " + formularioId + " asignado a " + dept + " (Adjuntos: " + allowAttachments + ")");
                         
                         nuevosPasos.add(new Workflow.Paso(label, orden++, dept, formularioId));
                     }
