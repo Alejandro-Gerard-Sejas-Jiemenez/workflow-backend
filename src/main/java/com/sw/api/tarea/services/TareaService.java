@@ -29,6 +29,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class TareaService {
     private final com.sw.api.formulario.repositories.FormularioRepository formularioRepository;
     private final NotificacionService notificacionService;
     private final BitacoraService bitacoraService;
+    private final ObjectMapper objectMapper;
 
     public TareaResponseDTO iniciarTarea(TareaCreateDTO dto, String username) {
         Usuario usuario = usuarioRepository.findByEmail(username)
@@ -166,9 +170,11 @@ public class TareaService {
                             "Error: No se encontró el Workflow relacionado (ID: " + tarea.getWorkflowId() + ")"));
 
             if (workflow.getPasos() != null && !workflow.getPasos().isEmpty()) {
-                // Saltamos al paso 1 (la primera tarea real) si existe, sino nos quedamos en el
-                // 0
-                int indexSiguiente = (workflow.getPasos().size() > 1) ? 1 : 0;
+                // Determinar dinámicamente si hay un nodo de decisión configurado
+                int indexSiguiente = determinarSiguientePasoIndex(tarea, workflow, tarea.getPasoActual());
+                if (indexSiguiente == -1) {
+                    indexSiguiente = (workflow.getPasos().size() > 1) ? 1 : 0;
+                }
                 var proximoPaso = workflow.getPasos().get(indexSiguiente);
                 if (proximoPaso != null) {
                     tarea.setAsignadoA(proximoPaso.getDepartamento());
@@ -204,25 +210,157 @@ public class TareaService {
         Workflow workflow = workflowRepository.findById(tarea.getWorkflowId())
                 .orElseThrow(() -> new RuntimeException("Workflow no encontrado"));
 
-        if (tarea.getPasoActual() < workflow.getPasos().size() - 1) {
-            tarea.setPasoActual(tarea.getPasoActual() + 1);
+        // 1. Aplicar nuevos datos primero para que las decisiones tengan la información actualizada
+        if (dto.nuevosDatos() != null) {
+            if (tarea.getDatos() == null) {
+                tarea.setDatos(new HashMap<>());
+            }
+            tarea.getDatos().putAll(dto.nuevosDatos());
+        }
+
+        // 2. Determinar el siguiente paso evaluando el diagrama y posibles nodos de decisión
+        int siguientePasoIndex = -1;
+        boolean ruteadoPorDecision = false;
+
+        String diagramData = workflow.getDiagramData();
+        if (diagramData != null && !diagramData.isBlank() && workflow.getPasos() != null) {
+            try {
+                JsonNode root = objectMapper.readTree(diagramData);
+                JsonNode nodes = root.get("nodes");
+                JsonNode edges = root.get("edges");
+
+                if (nodes != null && nodes.isArray() && edges != null && edges.isArray()) {
+                    var pasoActual = workflow.getPasos().get(tarea.getPasoActual());
+                    String currentLabel = pasoActual.getNombre();
+
+                    // Buscar el ID del nodo actual en el diagrama
+                    String currentNodeId = null;
+                    for (JsonNode n : nodes) {
+                        String type = n.has("type") ? n.get("type").asText() : "";
+                        String label = n.has("data") && n.get("data").has("label") ? n.get("data").get("label").asText() : "";
+                        if (("task".equals(type) || "start".equals(type)) && label.trim().equalsIgnoreCase(currentLabel.trim())) {
+                            currentNodeId = n.has("id") ? n.get("id").asText() : null;
+                            break;
+                        }
+                    }
+
+                    if (currentNodeId != null) {
+                        // Buscar conexiones salientes del nodo actual
+                        String targetNodeId = null;
+                        for (JsonNode edge : edges) {
+                            String source = edge.has("source") ? edge.get("source").asText() : "";
+                            if (currentNodeId.equals(source)) {
+                                targetNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                                break;
+                            }
+                        }
+
+                        if (targetNodeId != null) {
+                            // Buscar el nodo destino
+                            JsonNode targetNode = null;
+                            for (JsonNode n : nodes) {
+                                if (targetNodeId.equals(n.has("id") ? n.get("id").asText() : "")) {
+                                    targetNode = n;
+                                    break;
+                                }
+                            }
+
+                            if (targetNode != null) {
+                                String targetType = targetNode.has("type") ? targetNode.get("type").asText() : "";
+
+                                // Si el nodo destino es de tipo "decision" (exclusive gateway), evaluamos sus reglas
+                                if ("decision".equals(targetType)) {
+                                    boolean ruleEvaluationResult = evaluateDecisionNode(targetNode, tarea.getDatos());
+                                    System.out.println("🤖 [DECISION] Evaluando nodo de decisión [" + targetNodeId + "] -> Resultado: " + ruleEvaluationResult);
+
+                                    // Buscar las conexiones que salen de este nodo de decisión
+                                    String chosenNextNodeId = null;
+                                    for (JsonNode edge : edges) {
+                                        String source = edge.has("source") ? edge.get("source").asText() : "";
+                                        if (targetNodeId.equals(source)) {
+                                            String edgeLabel = edge.has("data") && edge.get("data").has("label") ? edge.get("data").get("label").asText() : "";
+                                            boolean isTrueBranch = isTrueBranch(edgeLabel);
+                                            
+                                            if (ruleEvaluationResult && isTrueBranch) {
+                                                chosenNextNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                                                break;
+                                            } else if (!ruleEvaluationResult && !isTrueBranch && (!edgeLabel.isBlank())) {
+                                                // Rama de descarte (No / Rechazado / etc.)
+                                                chosenNextNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    // Fallback por si no encontramos rama específica de falso
+                                    if (chosenNextNodeId == null && !ruleEvaluationResult) {
+                                        for (JsonNode edge : edges) {
+                                            String source = edge.has("source") ? edge.get("source").asText() : "";
+                                            if (targetNodeId.equals(source)) {
+                                                String edgeLabel = edge.has("data") && edge.get("data").has("label") ? edge.get("data").get("label").asText() : "";
+                                                boolean isTrueBranch = isTrueBranch(edgeLabel);
+                                                if (!isTrueBranch) {
+                                                    chosenNextNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (chosenNextNodeId != null) {
+                                        // Encontrar el nombre del paso final
+                                        String nextPasoLabel = null;
+                                        for (JsonNode n : nodes) {
+                                            if (chosenNextNodeId.equals(n.has("id") ? n.get("id").asText() : "")) {
+                                                nextPasoLabel = n.has("data") && n.get("data").has("label") ? n.get("data").get("label").asText() : "";
+                                                break;
+                                            }
+                                        }
+
+                                        if (nextPasoLabel != null && !nextPasoLabel.isBlank()) {
+                                            // Buscar el índice en los pasos del workflow
+                                            for (int i = 0; i < workflow.getPasos().size(); i++) {
+                                                if (workflow.getPasos().get(i).getNombre().trim().equalsIgnoreCase(nextPasoLabel.trim())) {
+                                                    siguientePasoIndex = i;
+                                                    ruteadoPorDecision = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error evaluando ruteo dinámico por decisión: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        // 3. Aplicar transición
+        if (ruteadoPorDecision && siguientePasoIndex != -1) {
+            tarea.setPasoActual(siguientePasoIndex);
             var proximoPaso = workflow.getPasos().get(tarea.getPasoActual());
             tarea.setAsignadoA(proximoPaso.getDepartamento());
             tarea.setEstado("EN_PROGRESO - " + proximoPaso.getNombre());
-
-            generarNotificacion(tarea.getAsignadoA(), "Tienes una nueva tarea asignada: " + workflow.getNombre());
+            generarNotificacion(tarea.getAsignadoA(), "Tienes una nueva tarea asignada por flujo de decisión: " + workflow.getNombre());
             generarNotificacion(tarea.getSolicitanteId(), "Tu trámite ha avanzado a: " + proximoPaso.getNombre());
         } else {
-            tarea.setEstado("COMPLETADO");
-            tarea.setAsignadoA(null);
-            generarNotificacion(tarea.getSolicitanteId(),
-                    "¡Felicidades! Tu trámite de " + workflow.getNombre() + " ha finalizado.");
-        }
-
-        if (dto.nuevosDatos() != null) {
-            if (tarea.getDatos() == null)
-                tarea.setDatos(new HashMap<>());
-            tarea.getDatos().putAll(dto.nuevosDatos());
+            // Ruteo secuencial tradicional
+            if (tarea.getPasoActual() < workflow.getPasos().size() - 1) {
+                tarea.setPasoActual(tarea.getPasoActual() + 1);
+                var proximoPaso = workflow.getPasos().get(tarea.getPasoActual());
+                tarea.setAsignadoA(proximoPaso.getDepartamento());
+                tarea.setEstado("EN_PROGRESO - " + proximoPaso.getNombre());
+                generarNotificacion(tarea.getAsignadoA(), "Tienes una nueva tarea asignada: " + workflow.getNombre());
+                generarNotificacion(tarea.getSolicitanteId(), "Tu trámite ha avanzado a: " + proximoPaso.getNombre());
+            } else {
+                tarea.setEstado("COMPLETADO");
+                tarea.setAsignadoA(null);
+                generarNotificacion(tarea.getSolicitanteId(), "¡Felicidades! Tu trámite de " + workflow.getNombre() + " ha finalizado.");
+            }
         }
 
         registrarHistorial(tarea, usuario.getId(), dto.accionUsuario(), dto.detalle());
@@ -247,6 +385,22 @@ public class TareaService {
 
     private void generarNotificacion(String usuarioId, String mensaje) {
         notificacionService.generarNotificacionSystem(usuarioId, mensaje, "TAREA_ASIGNADA");
+    }
+
+    private boolean isTrueBranch(String edgeLabel) {
+        if (edgeLabel == null) return false;
+        String clean = java.text.Normalizer.normalize(edgeLabel, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .trim();
+        return clean.equals("si") || 
+               clean.contains("apro") || 
+               clean.contains("acept") || 
+               clean.contains("true") || 
+               clean.contains("ture") || 
+               clean.contains("yes") || 
+               clean.contains("verdadero") || 
+               clean.equals("ok");
     }
 
     private TareaResponseDTO mapToDTO(Tarea t) {
@@ -300,5 +454,264 @@ public class TareaService {
                 t.getHistorial(),
                 t.getComentarios(),
                 formulario);
+    }
+
+    private int determinarSiguientePasoIndex(Tarea tarea, Workflow workflow, int pasoActualIndex) {
+        String diagramData = workflow.getDiagramData();
+        if (diagramData == null || diagramData.isBlank() || workflow.getPasos() == null) {
+            return -1;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(diagramData);
+            JsonNode nodes = root.get("nodes");
+            JsonNode edges = root.get("edges");
+
+            if (nodes == null || !nodes.isArray() || edges == null || !edges.isArray()) {
+                return -1;
+            }
+
+            var pasoActual = workflow.getPasos().get(pasoActualIndex);
+            String currentLabel = pasoActual.getNombre();
+
+            // Buscar el ID del nodo actual en el diagrama
+            String currentNodeId = null;
+            for (JsonNode n : nodes) {
+                String type = n.has("type") ? n.get("type").asText() : "";
+                String label = n.has("data") && n.get("data").has("label") ? n.get("data").get("label").asText() : "";
+                if (("task".equals(type) || "start".equals(type)) && label.trim().equalsIgnoreCase(currentLabel.trim())) {
+                    currentNodeId = n.has("id") ? n.get("id").asText() : null;
+                    break;
+                }
+            }
+
+            if (currentNodeId == null) {
+                return -1;
+            }
+
+            // Buscar conexiones salientes del nodo actual
+            String targetNodeId = null;
+            for (JsonNode edge : edges) {
+                String source = edge.has("source") ? edge.get("source").asText() : "";
+                if (currentNodeId.equals(source)) {
+                    targetNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                    break;
+                }
+            }
+
+            if (targetNodeId == null) {
+                return -1;
+            }
+
+            // Buscar el nodo destino
+            JsonNode targetNode = null;
+            for (JsonNode n : nodes) {
+                if (targetNodeId.equals(n.has("id") ? n.get("id").asText() : "")) {
+                    targetNode = n;
+                    break;
+                }
+            }
+
+            if (targetNode == null) {
+                return -1;
+            }
+
+            String targetType = targetNode.has("type") ? targetNode.get("type").asText() : "";
+
+            // Si el nodo destino es de tipo "decision" (exclusive gateway), evaluamos sus reglas
+            if ("decision".equals(targetType)) {
+                boolean ruleEvaluationResult = evaluateDecisionNode(targetNode, tarea.getDatos());
+                System.out.println("🤖 [DECISION] Evaluando nodo de decisión [" + targetNodeId + "] -> Resultado: " + ruleEvaluationResult);
+
+                // Buscar las conexiones que salen de este nodo de decisión
+                String chosenNextNodeId = null;
+                for (JsonNode edge : edges) {
+                    String source = edge.has("source") ? edge.get("source").asText() : "";
+                    if (targetNodeId.equals(source)) {
+                        String edgeLabel = edge.has("data") && edge.get("data").has("label") ? edge.get("data").get("label").asText() : "";
+                        boolean isTrueBranch = isTrueBranch(edgeLabel);
+                        
+                        if (ruleEvaluationResult && isTrueBranch) {
+                            chosenNextNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                            break;
+                        } else if (!ruleEvaluationResult && !isTrueBranch && (!edgeLabel.isBlank())) {
+                            chosenNextNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                            break;
+                        }
+                    }
+                }
+
+                // Fallback por si no encontramos rama específica de falso
+                if (chosenNextNodeId == null && !ruleEvaluationResult) {
+                    for (JsonNode edge : edges) {
+                        String source = edge.has("source") ? edge.get("source").asText() : "";
+                        if (targetNodeId.equals(source)) {
+                            String edgeLabel = edge.has("data") && edge.get("data").has("label") ? edge.get("data").get("label").asText() : "";
+                            boolean isTrueBranch = isTrueBranch(edgeLabel);
+                            if (!isTrueBranch) {
+                                chosenNextNodeId = edge.has("target") ? edge.get("target").asText() : null;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (chosenNextNodeId != null) {
+                    // Encontrar el nombre del paso final
+                    String nextPasoLabel = null;
+                    for (JsonNode n : nodes) {
+                        if (chosenNextNodeId.equals(n.has("id") ? n.get("id").asText() : "")) {
+                            nextPasoLabel = n.has("data") && n.get("data").has("label") ? n.get("data").get("label").asText() : "";
+                            break;
+                        }
+                    }
+
+                    if (nextPasoLabel != null && !nextPasoLabel.isBlank()) {
+                        // Buscar el índice en los pasos del workflow
+                        for (int i = 0; i < workflow.getPasos().size(); i++) {
+                            if (workflow.getPasos().get(i).getNombre().trim().equalsIgnoreCase(nextPasoLabel.trim())) {
+                                return i;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error en determinarSiguientePasoIndex: " + e.getMessage());
+        }
+
+        return -1;
+    }
+
+    private boolean evaluateDecisionNode(JsonNode decisionNode, Map<String, Object> data) {
+        if (data == null) {
+            System.out.println("🕵️‍♂️ [DECISION EVAL] Data is null. Returning false.");
+            return false;
+        }
+        try {
+            JsonNode dataNode = decisionNode.get("data");
+            if (dataNode == null || !dataNode.has("conditionConfig")) {
+                System.out.println("🕵️‍♂️ [DECISION EVAL] No conditionConfig found in decisionNode.");
+                return false;
+            }
+            JsonNode config = dataNode.get("conditionConfig");
+            String logicalOperator = config.has("logicalOperator") ? config.get("logicalOperator").asText() : "AND";
+            JsonNode rules = config.get("rules");
+
+            System.out.println("🕵️‍♂️ [DECISION EVAL] logicalOperator: " + logicalOperator + ", Data: " + data);
+
+            if (rules == null || !rules.isArray() || rules.size() == 0) {
+                System.out.println("🕵️‍♂️ [DECISION EVAL] No rules defined. Returning true by default.");
+                return true;
+            }
+
+            boolean isAnd = "AND".equalsIgnoreCase(logicalOperator);
+            boolean result = isAnd;
+
+            for (JsonNode rule : rules) {
+                String field = rule.has("field") ? rule.get("field").asText() : "";
+                String operator = rule.has("operator") ? rule.get("operator").asText() : "==";
+                String expectedValue = rule.has("value") ? rule.get("value").asText() : "";
+
+                Object actualValue = data.get(field);
+                boolean rulePassed = evaluateRule(actualValue, operator, expectedValue);
+
+                System.out.println("🕵️‍♂️ [RULE EVAL] Field: [" + field + "], Operator: [" + operator + "], Expected: [" + expectedValue + "], Actual: " + (actualValue != null ? actualValue.getClass().getSimpleName() + " (" + actualValue + ")" : "null") + " -> Passed: " + rulePassed);
+
+                if (isAnd) {
+                    result = result && rulePassed;
+                    if (!result) {
+                        System.out.println("   -> [AND] Rule failed. Short-circuiting.");
+                        break;
+                    }
+                } else {
+                    result = result || rulePassed;
+                    if (result) {
+                        System.out.println("   -> [OR] Rule passed. Short-circuiting.");
+                        break;
+                    }
+                }
+            }
+            System.out.println("🕵️‍♂️ [DECISION EVAL FINAL] Result: " + result);
+            return result;
+        } catch (Exception e) {
+            System.err.println("❌ Error evaluando reglas del nodo de decisión: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean evaluateRule(Object actualValue, String operator, String expectedValue) {
+        if (actualValue == null) {
+            boolean passed = "==".equals(operator) && (expectedValue == null || expectedValue.isBlank() || "false".equalsIgnoreCase(expectedValue));
+            System.out.println("   🔍 [evaluateRule] actualValue is null. Expected: [" + expectedValue + "], Operator: [" + operator + "] -> Passed: " + passed);
+            return passed;
+        }
+
+        String actualStr = actualValue.toString().trim();
+        String expectedStr = expectedValue.trim();
+
+        if (actualValue instanceof Boolean) {
+            boolean actBool = (Boolean) actualValue;
+            boolean expBool = "true".equalsIgnoreCase(expectedStr) || 
+                              "ture".equalsIgnoreCase(expectedStr) || 
+                              "1".equals(expectedStr) || 
+                              "yes".equalsIgnoreCase(expectedStr);
+            boolean passed = false;
+            if ("==".equals(operator)) passed = (actBool == expBool);
+            if ("!=".equals(operator)) passed = (actBool != expBool);
+            System.out.println("   🔍 [evaluateRule] Boolean comparison. actBool: " + actBool + ", expBool: " + expBool + " -> Passed: " + passed);
+            return passed;
+        }
+
+        if (actualValue instanceof java.util.Collection) {
+            java.util.Collection<?> col = (java.util.Collection<?>) actualValue;
+            boolean contains = col.stream().anyMatch(item -> item != null && item.toString().trim().equalsIgnoreCase(expectedStr));
+            boolean passed = false;
+            if ("==".equals(operator)) passed = contains;
+            if ("!=".equals(operator)) passed = !contains;
+            System.out.println("   🔍 [evaluateRule] Collection comparison. Collection: " + col + ", Expected: [" + expectedStr + "] -> Contains: " + contains + " -> Passed: " + passed);
+            return passed;
+        }
+
+        if (actualStr.contains(",")) {
+            String[] parts = actualStr.split(",");
+            boolean contains = false;
+            for (String p : parts) {
+                if (p.trim().equalsIgnoreCase(expectedStr)) {
+                    contains = true;
+                    break;
+                }
+            }
+            boolean passed = false;
+            if ("==".equals(operator)) passed = contains;
+            if ("!=".equals(operator)) passed = !contains;
+            System.out.println("   🔍 [evaluateRule] Comma-separated string comparison. Actual: [" + actualStr + "], Expected: [" + expectedStr + "] -> Contains: " + contains + " -> Passed: " + passed);
+            return passed;
+        }
+
+        try {
+            double actualNum = Double.parseDouble(actualStr);
+            double expectedNum = Double.parseDouble(expectedStr);
+            boolean passed = false;
+            switch (operator) {
+                case "==": passed = (actualNum == expectedNum); break;
+                case "!=": passed = (actualNum != expectedNum); break;
+                case ">": passed = (actualNum > expectedNum); break;
+                case "<": passed = (actualNum < expectedNum); break;
+                case ">=": passed = (actualNum >= expectedNum); break;
+                case "<=": passed = (actualNum <= expectedNum); break;
+            }
+            System.out.println("   🔍 [evaluateRule] Numeric comparison. Actual: " + actualNum + ", Expected: " + expectedNum + ", Operator: [" + operator + "] -> Passed: " + passed);
+            return passed;
+        } catch (NumberFormatException e) {
+            boolean passed = false;
+            switch (operator) {
+                case "==": passed = actualStr.equalsIgnoreCase(expectedStr); break;
+                case "!=": passed = !actualStr.equalsIgnoreCase(expectedStr); break;
+            }
+            System.out.println("   🔍 [evaluateRule] String comparison (fallback). Actual: [" + actualStr + "], Expected: [" + expectedStr + "], Operator: [" + operator + "] -> Passed: " + passed);
+            return passed;
+        }
     }
 }

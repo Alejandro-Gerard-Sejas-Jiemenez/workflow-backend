@@ -101,18 +101,27 @@ public class WorkflowDiagramSyncService {
                     if (data.has("formEnabled")) {
                         formActivo = data.get("formEnabled").asBoolean();
                     }
-
-                    if (formActivo) {
-                        System.out.println("📍 [DEBUG] Nodo procesado: " + label + " (Campos: " + (tieneFields ? data.get("formSchema").get("fields").size() : 0) + ")");
+                    
+                    System.out.println("📍 [DEBUG] Nodo procesado: " + label + " (Campos: " + (tieneFields ? data.get("formSchema").get("fields").size() : 0) + ")");
+                    
+                    // Determinar departamento
+                    String dept = null;
+                    
+                    if ("start".equals(type)) {
+                        dept = "RECEPCION";
+                        System.out.println("   [DEBUG] Nodo de inicio. Asignando automaticamente a RECEPCION.");
+                    } else {
+                        // 1. Intentar por parentId primero (Máxima precisión para carriles hijos en ng-diagram)
+                        if (node.has("parentId")) {
+                            String parentName = nodeNames.get(node.get("parentId").asText());
+                            if (parentName != null && !parentName.isBlank()) {
+                                dept = parentName;
+                                System.out.println("      [DEBUG] ¡Parent Match! Tarea [" + label + "] pertenece a carril [" + dept + "] por parentId");
+                            }
+                        }
                         
-                        // Determinar departamento
-                        String dept = null;
-                        
-                        if ("start".equals(type)) {
-                            dept = "RECEPCION";
-                            System.out.println("   [DEBUG] Nodo de inicio. Asignando automaticamente a RECEPCION.");
-                        } else {
-                            // 1. Detectar si está dentro de algún carril (lane) por coordenadas
+                        // 2. Si no tiene parentId, recurrir a colisión por coordenadas absolutas
+                        if (dept == null || dept.isBlank()) {
                             if (node.has("position")) {
                                 double taskX = node.get("position").has("x") ? node.get("position").get("x").asDouble() : 0.0;
                                 double taskY = node.get("position").has("y") ? node.get("position").get("y").asDouble() : 0.0;
@@ -141,33 +150,29 @@ public class WorkflowDiagramSyncService {
                                 }
                             }
                         }
-                        
-                        // 2. Si no se encontró carril por coordenadas, intentar parentId
-                        if ((dept == null || dept.isBlank()) && node.has("parentId")) {
-                            String parentName = nodeNames.get(node.get("parentId").asText());
-                            if (parentName != null && !parentName.isBlank()) {
-                                dept = parentName;
-                            }
+                    }
+                    
+                    // 3. Fallbacks a atributos directos
+                    if (dept == null || dept.isBlank()) {
+                        if (data.has("role") && !data.get("role").asText().isBlank()) {
+                            dept = data.get("role").asText();
+                        } else if (data.has("departamento") && !data.get("departamento").asText().isBlank()) {
+                            dept = data.get("departamento").asText();
+                        } else if (data.has("lane") && !data.get("lane").asText().isBlank()) {
+                            dept = data.get("lane").asText();
                         }
-                        
-                        // 3. Fallbacks a atributos directos
-                        if (dept == null || dept.isBlank()) {
-                            if (data.has("role") && !data.get("role").asText().isBlank()) {
-                                dept = data.get("role").asText();
-                            } else if (data.has("departamento") && !data.get("departamento").asText().isBlank()) {
-                                dept = data.get("departamento").asText();
-                            } else if (data.has("lane") && !data.get("lane").asText().isBlank()) {
-                                dept = data.get("lane").asText();
-                            }
-                        }
-                        
-                        // 4. Default global
-                        if (dept == null || dept.isBlank()) {
-                            dept = "RECEPCION";
-                        }
-                        
-                        dept = dept.replace("ROLE_", "");
+                    }
+                    
+                    // 4. Default global
+                    if (dept == null || dept.isBlank()) {
+                        dept = "RECEPCION";
+                    }
+                    
+                    dept = dept.replace("ROLE_", "");
 
+                    String formularioId = null;
+
+                    if (formActivo) {
                         // Crear o actualizar formulario (Incluso si esta vacio, para evitar el mensaje de error)
                         Formulario formulario = new Formulario();
                         String title = label;
@@ -224,11 +229,11 @@ public class WorkflowDiagramSyncService {
                         
                         formulario.setCampos(campos);
                         formulario = formularioRepository.save(formulario);
-                        String formularioId = formulario.getId();
+                        formularioId = formulario.getId();
                         System.out.println("   ✅ Formulario listo: " + formularioId + " asignado a " + dept + " (Adjuntos: " + allowAttachments + ")");
-                        
-                        nuevosPasos.add(new Workflow.Paso(label, orden++, dept, formularioId));
                     }
+                    
+                    nuevosPasos.add(new Workflow.Paso(label, orden++, dept, formularioId));
                 }
 
             workflow.setPasos(nuevosPasos);

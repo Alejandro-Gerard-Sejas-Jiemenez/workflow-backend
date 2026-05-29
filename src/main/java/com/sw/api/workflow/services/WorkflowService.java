@@ -112,7 +112,7 @@ public class WorkflowService {
         }
 
         return workflows.stream()
-                .map(this::mapToDTO)
+                .map(w -> mapToDTO(w))
                 .collect(Collectors.toList());
     }
 
